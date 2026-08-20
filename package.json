@@ -1,5 +1,5 @@
 {
-  "name": "math",
+  "name": "sqz",
   "version": "1.0.0",
   "description": "SQZ — clean-room prompt-compression grammar + translation library",
   "type": "module",
