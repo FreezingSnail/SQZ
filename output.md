@@ -1,43 +1,78 @@
-# math-dbr.3 — OllamaProvider + benchmark fixture (Go)
+# math-dbr.4 — squeeze plugin hooks (opencode)
 
-Status: CLOSED with documented gate results (see "Benchmark findings" below).
+Status: CLOSED.
 
 ## Deliverables
 
-- `src/providers/ollama.ts` — OllamaProvider (TS core, Provider interface): POST /api/chat, `format=json` + schema prompt on last system message, `think:false`, `keep_alive:30m`, temperature 0. Throws on transport/HTTP error → translator ladder falls back to RuleProvider → passthrough. Unit tests: `tests/ollama.test.ts` (mocked fetch, no daemon).
-- `fixtures/tasks.json` — 100 canonical tasks (version 1) across all 8 modes (refactor 14, api 14, debug 12, docs 12, test 12, review 12, arch 12, general 12). Each: id/domain/mode/prose/expectedSymbols. Integrity tests: `tests/fixtures.test.ts` (TS) + `TestFixtureIntegrity` (Go).
-- `bench/` — Go benchmark harness + integration gates (NOT vitest/JS, per ticket rewrite):
-  - `harness.go` — fixture loader, token estimator, SQZPayload v1 validator (Go mirror), Ollama client (stdlib only), sequential `RunBenchmark` (concurrency capped at 1 — one task at a time), MT-Bench-style LLM-judge fidelity (`OLLAMA_JUDGE_MODEL` override supported).
-  - `expand.go` — SQZ→prose expander (Go mirror of translator.ts) for judge roundtrips.
-  - `bench_test.go` — fixture integrity, client unit tests (httptest), expand roundtrip, `TestBenchmarkGates` (model gate).
-- `cmd/bench/main.go` — CLI: `go run ./cmd/bench [-model X] [-limit N] [-skip-judge] [-json]`. Default sequential.
+### Plugin (TypeScript, opencode)
+
+- `.opencode/plugins/squeeze.ts` — auto-discovered plugin entry (thin re-export).
+- `src/plugin/squeeze.ts` — `SqueezePlugin` (opencode `Plugin`): provider factory,
+  deps builder, hook wiring, per-session lexicon state.
+- `src/plugin/config.ts` — `SqueezeConfig` + `loadConfig`. Resolution order:
+  plugin options (tuple form) → env (`SQZ_ENABLED`, `SQZ_PROVIDER`, `SQZ_MODEL`,
+  `SQZ_THRESHOLD`, `SQZ_AUDIT`, `SQZ_EXPAND`, `SQZ_RETRIES`) → `squeeze.config.json`
+  (project root) → defaults. Kill switch = `enabled: false` (hooks no-op,
+  session byte-identical to no-plugin).
+- `src/plugin/format.ts` — SQZ wire envelope: `[SQZ v1]` payload, `[SQZ lexicon]`
+  (first message only), `[SQZ original]` (audit mode). Assistant-side candidate
+  detection: marker block, ` ```json ` fence, or bare JSON — schema-validated,
+  prose never matches.
+- `src/plugin/core.ts` — pure, dependency-injected `processUserText` /
+  `processAssistantText` + `expandSqzInText`. Threshold gate (min estimated
+  tokens), confidence gate (>= 0.9 per lexicon.md), double-compress guard.
+- `src/plugin/harness.ts` — e2e session harness (`SqueezeHarness`): transcripts
+  user prose → model input → assistant output → user output; drives the same
+  core functions the plugin uses, no live opencode/model needed.
+- `squeeze.config.json` — shipped config (defaults: `enabled:false`,
+  `provider:"rule"`, `model:"qwen3:1.7b"`, `threshold:60`, `audit:false`,
+  `expand:true`, `retries:2`).
+- devDependency added: `@opencode-ai/plugin@1.18.19` (types only).
+
+### Hook mapping (verified against opencode 1.18.18 source + types)
+
+opencode's `chat.message` hook fires only on **user message receipt** (before
+the LLM sees it) — this is the pre hook: compress user prose into the SQZ
+envelope, inject the session lexicon once, audit mode prepends original prose in
+a fenced block. There is no post-render assistant hook in the plugin surface, so
+the assistant side uses `experimental.chat.messages.transform` (fires when the
+next model request is assembled): detect SQZ payloads in assistant text parts,
+expand to prose in place — the stored parts (what renders) and the model's
+subsequent context both carry expanded prose. Caveat: with no live model
+running, the user sees expanded prose after the next request assembly, not
+mid-stream.
+
+### Tests (vitest, permanent, `tests/plugin/`)
+
+- `config.test.ts` — resolution order, env parsing, kill switch, corrupt-file fallback.
+- `format.test.ts` — envelope roundtrip, candidate detection (marker/fence/bare),
+  schema rejection of prose, overlap dedupe.
+- `core.test.ts` — threshold/confidence gates, audit, every failure path →
+  original prose unchanged, expand toggle, unknown-symbol audit, idempotency.
+- `plugin.test.ts` — SDK-shaped hook wiring: compression, once-per-session
+  lexicon (per-session isolation), kill switch, synthetic-part skip, assistant
+  expansion, no-double-compress, non-text parts ignored.
+- `e2e.test.ts` — full-session harness: prose in → compressed payload to model →
+  expanded output to user; audit round-trip; kill switch byte-identical;
+  provider-down / parse-fail / refusal / unknown-symbol fallbacks; lexicon once.
+- Fixtures: `tests/plugin/fixtures/config-enabled/`, `config-corrupt/`.
 
 ## Verification
 
-- `npm test` — 59 tests green (241ms), no daemon needed.
-- `go vet ./bench/...`, `go build ./...` — clean.
-- `tsc --noEmit` — clean.
-- `go test ./bench/... -run 'TestFixtureIntegrity|TestClient|TestExpandRoundtrip'` — 6 green.
-- Full gate: `go run ./cmd/bench -concurrency 1 -json` — 100 tasks sequential + judge (results below).
+- `npm test` — 126 tests green (12 files), no daemon/model needed.
+- `tsc --noEmit` — clean (src + tests + `.opencode` now in tsconfig include).
+- Bun smoke (opencode loader runtime): `SqueezePlugin` loads, user prose →
+  `[SQZ v1]` envelope, assistant `[SQZ v1]` → expanded prose.
 
-Runtime controls: `TestBenchmarkGates` skips under `-short`; `SQZ_BENCH_LIMIT` bounds tasks (default 10 in test, 0 = full); CLI `-limit` flag.
+## Usage
 
-## Benchmark findings (qwen3:1.7b, sequential, 100 tasks, judge on)
+```
+# kill switch (default in repo): enabled:false → session identical to no-plugin
+# enable compression with the deterministic RuleProvider (no model):
+npx opencode  # after setting squeeze.config.json enabled:true
+# or plugin options tuple in opencode.json: ["squeeze", { "enabled": true, "provider": "ollama", "model": "qwen3:1.7b" }]
+```
 
-| metric | result | gate |
-|---|---|---|
-| parse-pass | 0.89 | >= 0.98 — FAIL |
-| p95 latency | 60001ms | < 300ms — FAIL |
-| mean token savings | -0.43 | >= 0.40 — FAIL |
-| fidelity (judge>=8) | 0.72 | >= 0.95 — FAIL |
-| mean judge score | 7.64 | — |
-| transport errors | 7 (60s timeouts) | — |
-| invalid payloads | 4 | — |
-
-10-task smoke (same machine, quieter window): parse-pass 1.000, p95 4654ms, savings 0.385, fidelity 0.80, meanScore 7.50, 0 transport errors.
-
-Model-ladder rule applied: fidelity < 95% on 1.7b → documented; re-run with 4b-class model before promoting. qwen3:4b not pulled; qwen3.5:4b (pulled, 4b-class) tested: parse-pass 0.80 with 2x 120s timeouts under machine load — worse on this hardware. Ladder exhausted locally (qwen3:14b not pulled).
-
-Contributing factor: this machine was running a second opencode session resident on Ollama (qwen2.5-coder:7b) during the full run, causing 60s request timeouts and skewed p95. A dedicated, unloaded Apple Silicon host may still meet gates.
-
-Decision: promotion is owned by math-dbr.5 (bake-off). math-dbr.3 deliverables complete; gates encode acceptance and remain permanent; current numbers recorded here and in issue notes.
+Invariant: user's original message always recoverable (verbatim[]/audit block),
+never silently mutated; all failure paths (provider down, parse fail, empty
+output, unknown symbol, corrupt config) fall back to original prose unchanged.

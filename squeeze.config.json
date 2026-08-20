@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "provider": "rule",
+  "model": "qwen3:1.7b",
+  "threshold": 60,
+  "audit": false,
+  "expand": true,
+  "retries": 2
+}

@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "provider": "ollama",
+  "model": "test-model:1b",
+  "threshold": 20,
+  "audit": true,
+  "expand": false,
+  "retries": 3
+}
