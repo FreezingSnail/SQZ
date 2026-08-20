@@ -7,3 +7,7 @@
 
 # Node
 node_modules/
+
+# Swift afm-bridge build artifacts + local test sockets
+swift/afm-bridge/.build/
+tests/*.sock
