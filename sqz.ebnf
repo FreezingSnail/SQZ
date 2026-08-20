@@ -1,0 +1,109 @@
+(* ============================================================================
+   SQZ grammar — formal EBNF spec (ISO/IEC 14977 notation)
+   Clean-room, original notation. Not derived from any AGPL source.
+   Version: v1
+
+   A SQZ payload is a JSON document describing a compressed instruction
+   to a large model. Payloads are produced by a compressor and consumed
+   natively by the target model; SQZ symbol clauses appear inside
+   constraint strings and verbatim strings.
+
+   The grammar is defined in two layers:
+     1. `payload` — the v1 SQZPayload JSON shape (machine form).
+     2. `clause`  — SQZ symbol notation embedded in constraint strings
+        (human-readable compact form).
+   ============================================================================ *)
+
+(* ---------------------------------------------------------------- lexical *)
+
+whitespace      = { " " | "\t" | "\n" | "\r" } ;
+symbol          = "Δ" | "≋" | "∂" | "μ" | "⌁" | "→" | "✓" | "⏭" ;
+alpha           = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j"
+                | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t"
+                | "u" | "v" | "w" | "x" | "y" | "z" | "A" | "B" | "C" | "D"
+                | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N"
+                | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X"
+                | "Y" | "Z" ;
+digit           = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+name-char       = alpha | digit | "_" | "-" | "." | "/" ;
+identifier      = alpha { name-char } ;
+number          = [ "-" ] digit { digit } [ "." digit { digit } ]
+                  [ "e" | "E" [ "+" | "-" ] digit { digit } ] ;
+string          = '"' { char } '"' ;
+char            = ? any Unicode character except `"` and `\` ?
+                | escape ;
+escape          = "\\" ( '"' | "\\" | "/" | "b" | "f" | "n" | "r" | "t" | "u" )
+                  [ hexdig hexdig hexdig hexdig ] ;
+hexdig          = digit | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C"
+                | "D" | "E" | "F" ;
+json-value      = string | number | "true" | "false" | "null"
+                | object | array ;
+array           = "[" [ json-value { "," json-value } ] "]" ;
+member          = string ":" json-value ;
+object          = "{" [ member { "," member } ] "}" ;
+
+(* --------------------------------------------------------- payload (v1) *)
+
+payload         = whitespace "{" whitespace
+                    member-v ","
+                    member-mode ","
+                    member-target ","
+                    member-constraints ","
+                    member-verbatim ","
+                    member-confidence
+                  whitespace "}" whitespace ;
+
+member-v            = string ":" whitespace version ;
+version             = "1" ;
+
+member-mode         = string ":" whitespace mode ;
+mode                = "refactor" | "api" | "debug" | "docs" | "test"
+                    | "review" | "arch" | "general" ;
+
+member-target       = string ":" whitespace target ;
+target              = whitespace "{" whitespace
+                        member-files ","
+                        member-lang
+                      whitespace "}" whitespace ;
+member-files        = string ":" whitespace file-list ;
+file-list           = "[" [ string { "," string } ] "]" ;
+member-lang         = string ":" whitespace string ;
+
+member-constraints  = string ":" whitespace constraints ;
+constraints         = "[" [ clause-string { "," clause-string } ] "]" ;
+clause-string       = string ;
+
+member-verbatim     = string ":" whitespace verbatim ;
+verbatim            = "[" [ string { "," string } ] "]" ;
+
+member-confidence   = string ":" whitespace confidence ;
+confidence          = number ;              (* MUST be in [0, 1] *)
+
+(* -------------------------------------------------- SQZ symbol clauses *)
+(* Grammar for compact symbol notation inside clause strings. *)
+
+clause              = equivalence-clause | change-clause | edge-clause
+                    | minimal-clause | coverage-clause | pipeline-clause
+                    | verified-clause | skip-clause | prose-clause ;
+
+prose-clause        = string ;              (* verbatim fallback, no symbol *)
+
+prose-run           = identifier { whitespace identifier } ;
+operand             = identifier | string | prose-run ;
+
+equivalence-clause  = "≋" whitespace operand whitespace "=" whitespace operand ;
+
+change-clause       = "Δ" whitespace file-list ;
+
+edge-clause         = "∂" whitespace "(" [ string { "," string } ] ")" ;
+
+minimal-clause      = "μ" ;
+
+coverage-clause     = "⌁" whitespace ( "all" | identifier ) ;
+
+pipeline-clause     = step { whitespace "→" whitespace step } ;
+step                = identifier | string | prose-run ;
+
+verified-clause     = "✓" whitespace operand ;
+
+skip-clause         = "⏭" whitespace operand ;
