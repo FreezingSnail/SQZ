@@ -27,6 +27,15 @@ Gates unmet: fidelity >=0.95 by all local candidates (best 0.67, qwen3.5:4b);
 documented in bakeoff.md. Open: stronger judge (gpt-oss:20b), qwen3:4b pull,
 AFM re-test when Apple Intelligence enabled.
 
+## Deployment profiles (latency-sensitivity split)
+
+- **Interactive (default)**: `squeeze.config.json` — RuleProvider, p95 0ms.
+- **Batch / overnight**: `squeeze.config.batch.json` — ollama qwen3.5:4b,
+  threshold 0, audit on, timeoutMs 30000. Latency irrelevant for unattended
+  runs; 4b gives best fidelity (0.67) + savings (0.468). timeoutMs is
+  configurable (config file / SQZ_TIMEOUT_MS / options) because the 500ms
+  default would time out the 4b model.
+
 ## Verification
 
 - `npm test`: 148/148 green (1.5s)

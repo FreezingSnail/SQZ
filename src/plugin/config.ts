@@ -32,6 +32,8 @@ export interface SqueezeConfig {
   expand: boolean;
   /** Max retries after the first parse failure (translator ladder). */
   retries: number;
+  /** Per-request timeout ms for model-backed providers (batch profiles need more). */
+  timeoutMs: number;
   /** Symbol dictionary injected once per session (first user message). */
   lexicon: Lexicon;
 }
@@ -46,6 +48,7 @@ export const DEFAULT_SQUEEZE_CONFIG: SqueezeConfig = {
   audit: false,
   expand: true,
   retries: 2,
+  timeoutMs: 500,
   lexicon: DEFAULT_LEXICON,
 };
 
@@ -57,6 +60,7 @@ export interface SqueezeConfigFile {
   audit?: boolean;
   expand?: boolean;
   retries?: number;
+  timeoutMs?: number;
   lexicon?: Lexicon;
 }
 
@@ -78,6 +82,7 @@ export function readConfigFile(cwd: string): Partial<SqueezeConfig> | null {
   if (typeof parsed.audit === "boolean") out.audit = parsed.audit;
   if (typeof parsed.expand === "boolean") out.expand = parsed.expand;
   if (typeof parsed.retries === "number") out.retries = parsed.retries;
+  if (typeof parsed.timeoutMs === "number") out.timeoutMs = parsed.timeoutMs;
   if (Array.isArray(parsed.lexicon)) out.lexicon = parsed.lexicon;
   return out;
 }
@@ -163,6 +168,13 @@ export function loadConfig(
         file?.retries,
         DEFAULT_SQUEEZE_CONFIG.retries,
       ) ?? DEFAULT_SQUEEZE_CONFIG.retries,
+    timeoutMs:
+      pick(
+        typeof o.timeoutMs === "number" ? o.timeoutMs : undefined,
+        envInt("SQZ_TIMEOUT_MS"),
+        file?.timeoutMs,
+        DEFAULT_SQUEEZE_CONFIG.timeoutMs,
+      ) ?? DEFAULT_SQUEEZE_CONFIG.timeoutMs,
     lexicon,
   };
 }

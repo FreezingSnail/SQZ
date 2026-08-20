@@ -39,7 +39,7 @@ export function providerForConfig(config: SqueezeConfig): Provider {
     case "rule":
       return new RuleProvider();
     case "ollama":
-      return new OllamaProvider({ model: config.model });
+      return new OllamaProvider({ model: config.model, timeoutMs: config.timeoutMs });
     default:
       return new RuleProvider();
   }

@@ -32,7 +32,32 @@ describe("loadConfig — defaults", () => {
     expect(cfg.audit).toBe(false);
     expect(cfg.expand).toBe(true);
     expect(cfg.retries).toBe(2);
+    expect(cfg.timeoutMs).toBe(500);
     expect(cfg.lexicon).toEqual(DEFAULT_LEXICON);
+  });
+
+  it("timeoutMs resolves: options > env > file > default", () => {
+    vi.stubEnv("SQZ_TIMEOUT_MS", "15000");
+    const fromEnv = loadConfig();
+    expect(fromEnv.timeoutMs).toBe(15000);
+
+    const withOption = loadConfig({ timeoutMs: 45000 });
+    expect(withOption.timeoutMs).toBe(45000);
+  });
+
+  it("batch profile: ollama + long timeout + zero threshold + audit", () => {
+    const cfg = loadConfig({
+      provider: "ollama",
+      model: "qwen3.5:4b",
+      threshold: 0,
+      audit: true,
+      timeoutMs: 30000,
+    });
+    expect(cfg.provider).toBe("ollama");
+    expect(cfg.model).toBe("qwen3.5:4b");
+    expect(cfg.threshold).toBe(0);
+    expect(cfg.audit).toBe(true);
+    expect(cfg.timeoutMs).toBe(30000);
   });
 
   it("options tuple form wins over everything", () => {

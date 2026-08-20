@@ -1,0 +1,10 @@
+{
+  "enabled": false,
+  "provider": "ollama",
+  "model": "qwen3.5:4b",
+  "threshold": 0,
+  "audit": true,
+  "expand": true,
+  "retries": 2,
+  "timeoutMs": 30000
+}

@@ -59,6 +59,18 @@ Rationale:
 | qwen3:4b, gemma4:e4b, granite4.1:3b | not pulled — untested |
 | AFM | bridge ready; Apple Intelligence off on this Mac — untestable |
 
+## Deployment profiles
+
+| Profile | Config | Why |
+|---|---|---|
+| **interactive (default)** | `squeeze.config.json` — provider `rule`, threshold 60 | p95 0ms; the only path that meets the "fast" requirement |
+| **batch / overnight** | `squeeze.config.batch.json` — provider `ollama`, model `qwen3.5:4b`, threshold 0, audit true, timeoutMs 30000 | latency irrelevant; 4b gives best fidelity (0.67) + savings (0.468) |
+
+Batch guidance: qwen3.5:4b takes ~10.5s p95 per compress — fine for unattended
+runs; `audit: true` keeps the original prose in the message so nothing is ever
+lost in an overnight job. `timeoutMs: 30000` is required — the interactive
+default (500ms) would time out the 4b model on every call.
+
 ## Open items
 
 1. Fidelity gate (>=0.95) unattained by all local candidates — revisit with
