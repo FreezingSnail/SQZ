@@ -15,3 +15,4 @@
 {"id":"int-eb62968cbf5c4727c5da8a0b656a1957","kind":"field_change","created_at":"2026-08-20T15:08:57.5781Z","actor":"FreezingSnail","issue_id":"math-dbr","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
 {"id":"int-0f2075cb4c54d6b65023fad05ba4a491","kind":"field_change","created_at":"2026-08-20T16:48:33.939834Z","actor":"FreezingSnail","issue_id":"math-dbr","extra":{"field":"status","new_value":"open","old_value":"closed"}}
 {"id":"int-74b1f801a04775006e157144090f9114","kind":"field_change","created_at":"2026-08-20T17:26:38.432762Z","actor":"FreezingSnail","issue_id":"math-dbr.7","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
+{"id":"int-b65ab645ac4440ee976ef34bddf46791","kind":"field_change","created_at":"2026-08-20T18:09:13.053053Z","actor":"FreezingSnail","issue_id":"math-dbr.8","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}

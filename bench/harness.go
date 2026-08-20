@@ -95,60 +95,6 @@ var modes = map[string]bool{
 	"test": true, "review": true, "arch": true, "general": true,
 }
 
-// validatePayload is the Go mirror of src/validate.ts (SQZPayload v1).
-func validatePayload(v any) (bool, []string) {
-	var errs []string
-	obj, ok := v.(map[string]any)
-	if !ok {
-		return false, []string{"/ type must be object"}
-	}
-	if n, ok := obj["v"].(float64); !ok || n != 1 {
-		errs = append(errs, "/v must be 1")
-	}
-	if m, ok := obj["mode"].(string); !ok || !modes[m] {
-		errs = append(errs, "/mode invalid")
-	}
-	target, ok := obj["target"].(map[string]any)
-	if !ok {
-		errs = append(errs, "/target type must be object")
-	} else {
-		if files, ok := target["files"].([]any); !ok || len(files) == 0 {
-			errs = append(errs, "/target/files must be non-empty array")
-		} else {
-			for i, f := range files {
-				if _, ok := f.(string); !ok || f.(string) == "" {
-					errs = append(errs, fmt.Sprintf("/target/files/%d must be non-empty string", i))
-				}
-			}
-		}
-		if lang, ok := target["lang"].(string); !ok || lang == "" {
-			errs = append(errs, "/target/lang must be non-empty string")
-		}
-	}
-	if arr, ok := obj["constraints"].([]any); !ok {
-		errs = append(errs, "/constraints type must be array")
-	} else {
-		for i, c := range arr {
-			if _, ok := c.(string); !ok {
-				errs = append(errs, fmt.Sprintf("/constraints/%d must be string", i))
-			}
-		}
-	}
-	if arr, ok := obj["verbatim"].([]any); !ok {
-		errs = append(errs, "/verbatim type must be array")
-	} else {
-		for i, c := range arr {
-			if _, ok := c.(string); !ok {
-				errs = append(errs, fmt.Sprintf("/verbatim/%d must be string", i))
-			}
-		}
-	}
-	if c, ok := obj["confidence"].(float64); !ok || c < 0 || c > 1 {
-		errs = append(errs, "/confidence must be number 0..1")
-	}
-	return len(errs) == 0, errs
-}
-
 // ---------------------------------------------------------------- ollama client
 
 // Message mirrors src/types.ts ChatMessage.
@@ -251,6 +197,24 @@ func (c *OllamaClient) AvailableModel() string {
 	return ""
 }
 
+// compressSystem is the v2 compress prompt: lexicon table + grammar + example.
+// No JSON schema — the small model emits one plain SQZ line.
+const compressSystem = "You are the SQZ compressor. Encode the user's request into ONE SQZ line using this grammar:\n" +
+	`<mode> Δ["file1","file2"] [L:<lang>] <symbol>[operand]... v"verbatim clause"` + "\n" +
+	"Modes: refactor api debug docs test review arch general.\n" +
+	"Lexicon:\n" +
+	"Δ = change-set: files this payload may modify\n" +
+	"≋ = behavior-equivalence: preserve runtime behavior\n" +
+	"∂ = edge-cases: cases that must be handled\n" +
+	"μ = minimal diff\n" +
+	"⌁ = complete coverage\n" +
+	"→ = pipeline of stages\n" +
+	"✓ = verified against acceptance criteria\n" +
+	"⏭ = deliberately skipped / leave untouched\n" +
+	"Lossless policy: if a clause does not map cleanly to a symbol, put the ENTIRE clause verbatim into v\"...\" — never drop, reword, or summarize content.\n" +
+	`Example: refactor Δ["src/a.ts"] L:ts ≋ μ ∂ v"keep log messages identical"` + "\n" +
+	"Emit ONLY the line."
+
 func schemaPrompt(schema any) string {
 	b, _ := json.Marshal(schema)
 	return "Respond with a single JSON object conforming to this JSON Schema:\n" +
@@ -292,24 +256,27 @@ func parseContent(content string) any {
 
 var fenceRe = regexp.MustCompile("(?s)^```(?:json)?\\s*([\\s\\S]*?)\\s*```$")
 
-// Chat posts to /api/chat with format=json. Returns the parsed JSON object or
-// raw content string; errors on transport/HTTP/daemon-error.
+// Chat posts to /api/chat. When schema is nil (v2 compress path) the request
+// is plain text — no format:json, no schema prompt. When schema is given
+// (judge-style calls) format=json + schema prompt are applied.
 func (c *OllamaClient) Chat(messages []Message, schema any) (any, error) {
-	body, err := json.Marshal(map[string]any{
-		"model":    c.Model,
-		"messages": withSchemaPrompt(messages, schema),
-		"format":   "json",
-		"stream":   false,
-		// Reasoning models (qwen3.5+) emit chain-of-thought by default; disable
-		// it for low-latency structured output. Ignored by non-thinking models.
-		"think":     false,
-		"keep_alive": "30m", // hold the model in memory across the 100-task run (avoid reload stalls)
-		"options":   map[string]any{"temperature": 0},
-	})
+	body := map[string]any{
+		"model":      c.Model,
+		"messages":   messages,
+		"stream":     false,
+		"think":      false,
+		"keep_alive": "30m",
+		"options":    map[string]any{"temperature": 0},
+	}
+	if schema != nil {
+		body["messages"] = withSchemaPrompt(messages, schema)
+		body["format"] = "json"
+	}
+	encoded, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
-	res, err := c.HTTP.Post(c.BaseURL+chatPath, "application/json", bytes.NewReader(body))
+	res, err := c.HTTP.Post(c.BaseURL+chatPath, "application/json", bytes.NewReader(encoded))
 	if err != nil {
 		return nil, fmt.Errorf("ollama request failed: %w", err)
 	}
@@ -367,29 +334,7 @@ type BenchmarkOptions struct {
 	Concurrency int
 	Judge       bool   // run MT-Bench-style fidelity judge roundtrip
 	JudgeModel  string // model for the judge (MT-Bench uses a strong judge); "" = same as client
-}
-
-// fullSchema is the Go mirror of sqz-schema.json (SQZPayload v1). Passing the
-// complete schema in the prompt is what lets a 1.7B model emit a valid payload;
-// a minimal schema produces free-form JSON.
-var fullSchema = map[string]any{
-	"type": "object",
-	"properties": map[string]any{
-		"v":    map[string]any{"const": 1},
-		"mode": map[string]any{"type": "string", "enum": []any{"refactor", "api", "debug", "docs", "test", "review", "arch", "general"}},
-		"target": map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"files": map[string]any{"type": "array", "items": map[string]any{"type": "string", "minLength": 1}, "minItems": 1},
-				"lang":  map[string]any{"type": "string", "minLength": 1},
-			},
-			"required": []any{"files", "lang"},
-		},
-		"constraints": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
-		"verbatim":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
-		"confidence":  map[string]any{"type": "number", "minimum": 0, "maximum": 1},
-	},
-	"required": []any{"v", "mode", "target", "constraints", "verbatim", "confidence"},
+	Rule        bool   // deterministic RuleProvider compress (no model, µs) instead of Ollama
 }
 
 // RunBenchmark exercises `tasks` against the client and aggregates metrics.
@@ -402,19 +347,54 @@ func RunBenchmark(c *OllamaClient, tasks []Task, opts BenchmarkOptions) Result {
 	}
 	rows := mapLimit(tasks, opts.Concurrency, func(t Task) Row {
 		s := time.Now()
-		raw, err := c.Chat(
-			[]Message{
-				{Role: "system", Content: `{"task":"compress-prose-to-sqz","lexicon":[]}`},
-				{Role: "user", Content: t.Prose},
-			},
-			fullSchema,
+
+		// Deterministic path: no model, microseconds per task.
+		if opts.Rule {
+			line := EncodeLine(t.Prose)
+			valid, errs := ValidateLine(line, lineKnownSymbols())
+			return Row{Task: t, OK: valid, Latency: time.Since(s), Payload: line, Err: strings.Join(errs, "; ")}
+		}
+
+		// Retry ladder mirrors src/translator.ts generateValidLine: up to 2
+		// retries with error injection, then the row is marked invalid.
+		const maxRetries = 2
+		var (
+			line  string
+			errs  []string
+			err   error
+			valid bool
 		)
+		history := []Message{
+			{Role: "system", Content: compressSystem},
+			{Role: "user", Content: t.Prose},
+		}
+		for attempt := 0; attempt <= maxRetries; attempt++ {
+			var raw any
+			raw, err = c.Chat(history, nil) // v2 plain-line compress: no schema, no format:json
+			if err != nil {
+				break
+			}
+			var ok bool
+			line, ok = raw.(string)
+			if !ok {
+				err = errors.New("compress output is not text")
+				break
+			}
+			line = strings.TrimSpace(line)
+			valid, errs = ValidateLine(line, lineKnownSymbols())
+			if valid {
+				break
+			}
+			history = append(history,
+				Message{Role: "assistant", Content: line},
+				Message{Role: "system", Content: "Grammar validation failed: " + strings.Join(errs, "; ") + ". Respond again with a single valid SQZ line only."},
+			)
+		}
 		lat := time.Since(s)
 		if err != nil {
 			return Row{Task: t, OK: false, Latency: lat, Err: err.Error()}
 		}
-		valid, errs := validatePayload(raw)
-		return Row{Task: t, OK: valid, Latency: lat, Payload: raw, Err: strings.Join(errs, "; ")}
+		return Row{Task: t, OK: valid, Latency: lat, Payload: line, Err: strings.Join(errs, "; ")}
 	})
 
 	var (
@@ -440,8 +420,11 @@ func RunBenchmark(c *OllamaClient, tasks []Task, opts BenchmarkOptions) Result {
 
 	var savings []float64
 	for _, r := range valid {
-		b, _ := json.Marshal(r.Payload)
-		savings = append(savings, tokenSavings(string(b), r.Task.Prose))
+		line, ok := r.Payload.(string)
+		if !ok {
+			continue
+		}
+		savings = append(savings, tokenSavings(line, r.Task.Prose))
 	}
 	if len(savings) > 0 {
 		total := 0.0
@@ -462,7 +445,11 @@ func RunBenchmark(c *OllamaClient, tasks []Task, opts BenchmarkOptions) Result {
 			judgeClient = NewOllamaClient(c.BaseURL, opts.JudgeModel, c.HTTP.Timeout)
 		}
 		judgeRows := mapLimit(valid, opts.Concurrency, func(r Row) judgeOutcome {
-			roundtrip := Expand(r.Payload)
+			line, ok := r.Payload.(string)
+			if !ok {
+				return judgeOutcome{score: 0, err: errors.New("judge: payload not a line")}
+			}
+			roundtrip := Expand(line)
 			raw, err := judgeClient.Chat(
 				[]Message{
 					{Role: "system", Content: "You are an impartial judge. Compare the ORIGINAL task and its ROUNDTRIPPED version. Rate intent preservation from 1 to 10. Reply with JSON {\"score\": number} only."},

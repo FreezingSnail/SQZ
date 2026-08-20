@@ -14,6 +14,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -151,22 +152,62 @@ func TestClientChatHTTPError(t *testing.T) {
 }
 
 func TestExpandRoundtrip(t *testing.T) {
-	payload := map[string]any{
-		"v":    1,
-		"mode": "refactor",
-		"target": map[string]any{
-			"files": []any{"src/a.ts"},
-			"lang":  "ts",
-		},
-		"constraints": []any{"≋ behavior(new) = behavior(old)", "μ", "Δ [\"src/a.ts\"]"},
-		"verbatim":    []any{"Keep the diff minimal."},
-		"confidence":  0.9,
-	}
-	out := Expand(payload)
-	for _, want := range []string{"Refactor src/a.ts in ts.", "Preserve behavior:", "Minimal diff.", "Change files:", "Keep the diff minimal."} {
-		if !regexp.MustCompile(regexp.QuoteMeta(want)).MatchString(out) {
+	line := `refactor Δ["src/a.ts"] L:ts ≋ μ ∂[(edge cases)] v"Keep the diff minimal."`
+	out := Expand(line)
+	for _, want := range []string{"Refactor src/a.ts in ts.", "Preserve behavior:", "Minimal diff.", "Handle edge cases: (edge cases).", "Keep the diff minimal."} {
+		if !strings.Contains(out, want) {
 			t.Errorf("expand output missing %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestLineValidation(t *testing.T) {
+	known := lineKnownSymbols()
+	valid := `refactor Δ["src/a.ts"] L:ts ≋ μ ∂ v"raw prose"`
+	if ok, errs := ValidateLine(valid, known); !ok {
+		t.Fatalf("valid line rejected: %v", errs)
+	}
+	bad := []string{
+		"",                                          // empty
+		`Δ["src/a.ts"] μ`,                           // missing mode
+		`bogus Δ["src/a.ts"]`,                       // bad mode
+		`refactor μ`,                                // missing target
+		`refactor Δ[]`,                              // no files
+		`refactor Δ["src/a.ts"] λ`,                  // unknown symbol
+		`refactor Δ["src/a.ts"] ∂[unclosed`,         // unbalanced
+		`refactor Δ["src/a.ts] v"oops`,              // unterminated quote
+		`refactor Δ["src/a.ts"] gazonk`,             // stray token
+	}
+	for _, line := range bad {
+		if ok, _ := ValidateLine(line, known); ok {
+			t.Errorf("malformed line accepted: %q", line)
+		}
+	}
+}
+
+func TestClientChatPlain(t *testing.T) {
+	var gotBody map[string]any
+	srv := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/chat" {
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"message": map[string]any{"content": "refactor Δ[\"src/a.ts\"] L:ts μ"},
+		})
+	})
+	c := NewOllamaClient(srv.URL, "qwen3:1.7b", 2*time.Second)
+	got, err := c.Chat([]Message{{Role: "user", Content: "hi"}}, nil)
+	if err != nil {
+		t.Fatalf("chat: %v", err)
+	}
+	if _, hasFormat := gotBody["format"]; hasFormat {
+		t.Errorf("v2 compress must not set format, got %v", gotBody["format"])
+	}
+	if line, ok := got.(string); !ok || line == "" {
+		t.Errorf("expected raw line string, got %#v", got)
 	}
 }
 

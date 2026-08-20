@@ -1,39 +1,35 @@
-# SQZ v2 — plain-line payload (math-dbr.7)
+# SQZ v2 — final state (math-dbr.7 + math-dbr.8)
 
-## What changed
+## What v2 changed (math-dbr.7)
 
-v1 compress emitted a JSON envelope (`{"v":1,"mode":...,"target":{...},"constraints":[...],"verbatim":[...],"confidence":...}`) validated by JSON Schema, with `format:json` structured generation. Measured on qwen3:1.7b: **token savings −0.43** (envelope larger than prose) and ~2-5s per compress (schema in prompt + long JSON decode + parse retries).
+Dropped the JSON envelope from the compress path. Wire format = ONE plain SQZ
+line: `refactor Δ["src/a.ts"] L:ts ≋ μ ∂ v"keep log messages identical"`.
+Validation = local grammar check (µs, no model). Lossless policy: unencodable
+clauses go into v"..." verbatim segments. Lexicon injected once per session.
 
-v2 drops the envelope entirely. The wire format is **one plain SQZ line**:
+## Re-bake-off results (math-dbr.8, 100 tasks, sequential, unloaded machine)
 
-```
-refactor Δ["src/a.ts"] L:ts ≋ μ ∂ v"keep log messages identical"
-```
+| Provider | Parse-pass | p95 | Savings | Fidelity | Full run |
+|---|---|---|---|---|---|
+| rule (no model) | 1.000 | 0ms | 0.196 | 0.53 | 2:01 |
+| qwen3:1.7b | 0.97 | 2.3s | 0.415 | 0.37 | 4:45 |
+| qwen3.5:4b | 0.95 | 10.5s | 0.468 | 0.67 | 19:17 |
 
-- No JSON, no schema prompt, no `format:json` — plain text generation
-- Validation = local grammar check (microseconds, zero model roundtrips)
-- Lossless policy intact: unencodable clauses go into `v"..."` verbatim segments
-- Lexicon still injected once per session; per-message payload is just the line
+Before/after (qwen3:1.7b, v1 → v2): savings -0.43 → +0.415; p95 60s → 2.3s;
+transport errors 7 → 0. The v2 redesign fixed both failure modes.
 
-## Files
+## Promoted default
 
-- `src/line.ts` — v2 line tokenizer + AST (new)
-- `src/translator.ts` — compress → SQZLine; expand(line); grammar retry ladder
-- `src/validate.ts` — validateLine (local grammar) + validatePayload (v1, tooling-only)
-- `src/providers.ts` — RuleProvider emits lines; passthroughLine
-- `src/providers/ollama.ts` — generate(messages, schema?) — plain text when schema omitted
-- `src/plugin/format.ts` / `core.ts` — `[SQZ v2]` block carries the line; marker-only detection (no bare-JSON scanning)
-- `sqz.ebnf` — v2 line grammar; v1 payload grammar marked tooling-only
-- Tests: translator/providers/validate/plugin suites updated to v2 + new grammar tests
+**RuleProvider** (deterministic) — the only candidate that meets the "fast"
+requirement (p95 0ms). Model compress opt-in for long messages.
+
+Gates unmet: fidelity >=0.95 by all local candidates (best 0.67, qwen3.5:4b);
+documented in bakeoff.md. Open: stronger judge (gpt-oss:20b), qwen3:4b pull,
+AFM re-test when Apple Intelligence enabled.
 
 ## Verification
 
-- `npm test`: 148/148 green (1.1s)
+- `npm test`: 148/148 green (1.5s)
 - `npx tsc --noEmit`: clean
-- Roundtrip lossless via RuleProvider (hand cases)
-- validateLine: 10k validations < 1s (measured in test)
-
-## Next
-
-math-dbr.8: bench v2 (Go harness → plain-line metrics) + re-bake-off on qwen3:1.7b.
-Expect: positive savings (line < prose), sub-second compress latency, simpler grammar pass rate.
+- `go test ./bench/... -short`: green (0.3s), `go vet ./...`: clean
+- Full v2 runs: rule 2:01, qwen3:1.7b 4:45, qwen3.5:4b 19:17 (sequential + judge)

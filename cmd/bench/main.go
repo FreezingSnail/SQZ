@@ -25,6 +25,7 @@ func main() {
 		baseURL   = flag.String("url", "", "ollama base URL (default: env OLLAMA_BASE_URL or http://127.0.0.1:11434)")
 		limit     = flag.Int("limit", 0, "max tasks to run (0 = all)")
 		conc      = flag.Int("concurrency", 1, "parallel requests (1 = sequential; local runner serializes anyway)")
+		rule      = flag.Bool("rule", false, "use deterministic RuleProvider compress (no model, µs) instead of Ollama")
 		skipJudge = flag.Bool("skip-judge", false, "skip the LLM-judge fidelity roundtrip")
 		timeout   = flag.Duration("timeout", 60*time.Second, "per-request timeout")
 		jsonOut   = flag.Bool("json", false, "emit machine-readable JSON summary")
@@ -46,6 +47,33 @@ func main() {
 	}
 
 	client := bench.NewOllamaClient(*baseURL, *model, *timeout)
+
+	tasks := fix.Tasks
+	if *limit > 0 && *limit < len(tasks) {
+		tasks = tasks[:*limit]
+	}
+
+	if *rule {
+		// Deterministic path: no model needed for compress; judge (if on) still
+		// needs the daemon — allowed to fail per-row.
+		fmt.Printf("bench: model=rule tasks=%d concurrency=%d judge=%v\n", len(tasks), *conc, !*skipJudge)
+		res := bench.RunBenchmark(client, tasks, bench.BenchmarkOptions{
+			Concurrency: *conc,
+			Judge:       !*skipJudge,
+			JudgeModel:  os.Getenv("OLLAMA_JUDGE_MODEL"),
+			Rule:        true,
+		})
+		if *jsonOut {
+			b, _ := json.MarshalIndent(res, "", "  ")
+			fmt.Println(string(b))
+			return
+		}
+		fmt.Printf("bench: parse-pass=%.3f p95=%.1fms savings=%.3f fidelity=%.3f meanScore=%.2f judged=%d judgeFailed=%d transportErrors=%d invalidPayloads=%d\n",
+			res.ParsePass, res.P95MS, res.MeanSavings, res.Fidelity, res.MeanScore,
+			res.Judged, res.JudgeFailed, res.TransportErrors, res.InvalidPayloads)
+		return
+	}
+
 	if !client.Ping() {
 		fmt.Println("bench: ollama daemon not reachable at " + *baseURL + " — skipping (install/start ollama to benchmark)")
 		return
@@ -61,16 +89,13 @@ func main() {
 	}
 	client.Model = chosen
 
-	tasks := fix.Tasks
-	if *limit > 0 && *limit < len(tasks) {
-		tasks = tasks[:*limit]
-	}
 	fmt.Printf("bench: model=%s tasks=%d concurrency=%d judge=%v\n", chosen, len(tasks), *conc, !*skipJudge)
 
 	res := bench.RunBenchmark(client, tasks, bench.BenchmarkOptions{
 		Concurrency: *conc,
 		Judge:       !*skipJudge,
 		JudgeModel:  os.Getenv("OLLAMA_JUDGE_MODEL"),
+		Rule:        *rule,
 	})
 
 	if *jsonOut {

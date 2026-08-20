@@ -194,6 +194,12 @@ export function parseLine(line: string, lexicon: Lexicon): LineAST {
     // Mode word (bare) — first bare word must be a valid mode.
     let j = i;
     while (j < s.length && !/\s|["[\]()]/.test(s[j])) j++;
+    if (j === i) {
+      // Stray structural char ([ ] ( )): skip it, flag it — never loop.
+      ast.errors.push(`unexpected token "${s[i]}"`);
+      i++;
+      continue;
+    }
     const word = s.slice(i, j);
     if (!ast.mode && (MODES as readonly string[]).includes(word)) {
       ast.mode = word as Mode;
