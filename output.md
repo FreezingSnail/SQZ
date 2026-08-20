@@ -1,27 +1,46 @@
-# math-dbr.1 — SQZ grammar spec
+# math-dbr.2 — Translator core + RuleProvider + unit tests
 
-Deliverables for SQZ milestone 1 (grammar spec, no model). Clean-room,
-original notation; no text derived from nucleus (AGPL) repo.
+Deliverables for SQZ milestone 2: model-independent TypeScript translation
+library — compress/expand, provider interface, deterministic RuleProvider
+fallback, schema validation, retry/fallback ladder, vitest suite.
 
-## Files created (repo root)
+## Files created
 
 | file | purpose |
 |---|---|
-| `sqz.ebnf` | Formal EBNF grammar (ISO/IEC 14977) for SQZ v1 payloads: lexical layer (JSON tokens), `payload` production mirroring SQZPayload v1 (`v`/`mode`/`target`/`constraints`/`verbatim`/`confidence`), and `clause` productions for the compact symbol notation: Δ change-set, ≋ behavior-equivalence, ∂ edge-cases, μ minimal, ⌁ complete-coverage, → pipeline, ✓ verified, ⏭ skip. |
-| `lexicon.md` | Symbol dictionary — one symbol, one meaning, one domain (8 symbols); usage notes (lossless policy, confidence gate, domain discipline, composition). Size ~800 tokens for session injection. |
-| `sqz-schema.json` | JSON Schema (draft-07) mirroring SQZ AST v1: required `v` (const 1), `mode` enum `refactor|api|debug|docs|test|review|arch|general`, `target` (non-empty `files[]` + `lang`), `constraints[]` strings, `verbatim[]` strings, `confidence` number 0–1, `additionalProperties: false`. |
+| `src/types.ts` | Shared types: `Mode`, `SQZPayload` (v1), `LexiconEntry`, `Lexicon`, `ChatMessage`, `Provider`, `CompressOptions`, `CompressResult`, `ExpandOptions`. |
+| `src/validate.ts` | ajv (draft-07) validator compiled from `sqz-schema.json`; `validatePayload(value) → {valid, errors}`. |
+| `src/providers.ts` | `Provider` contract impls: `RuleProvider` (deterministic dictionary compression, no model, never throws, honors lexicon injected via system message, `DEFAULT_LEXICON` mirror of lexicon.md) and `passthroughPayload()` (graceful degradation: prose verbatim, confidence 0). |
+| `src/translator.ts` | `compress(prose, {domain?, lexicon, provider?, retries?}) → {sqz, verbatim, confidence, latencyMs}`; `expand(payload, lexicon, {audit?}) → prose`. Retry/error-injection loop, provider-down fallback, unknown-symbol literal render + audit flag. |
+| `tests/translator.test.ts` | Roundtrip, retry w/ error injection, all-retries-fail passthrough, unparseable output passthrough, provider-down → RuleProvider, domain override, unknown-symbol audit. |
+| `tests/providers.test.ts` | RuleProvider determinism, schema validity, system-message lexicon injection, file extraction, pipeline clause, never-throws. |
+| `tests/validate.test.ts` | Schema: valid payload + all 8 modes accepted; v/2, bad mode, confidence out of range, empty files, missing field, extra property, non-string constraint rejected. |
+| `tests/lexicon.test.ts` | lexicon.md < 1000 tokens; DEFAULT_LEXICON: 8 symbols, unique symbol+domain, non-empty meaning/example. |
+| `package.json`, `tsconfig.json` | npm setup: typescript + vitest + ajv; scripts `test` (vitest run), `typecheck`, `build`. |
+
+## Error ladder (epic design) — as implemented
+
+- parse/schema fail → inject validation errors into message list → retry (max 2) → passthrough (prose in `verbatim[]`, confidence 0)
+- provider down/timeout → RuleProvider fallback → passthrough
+- unknown symbol in expand → render literally + `unknown-symbol:<glyph>` audit flag
+- invariant: original prose always recoverable (verbatim[] passes through byte-for-byte in expand); never silently mutated
 
 ## Acceptance verification
 
-- **Every symbol exactly one meaning per domain** — lexicon table: 8 symbols × distinct domains (change, behavior, edge, scope, coverage, flow, verification, omission); no reuse. Enforced by table structure; task-2 validator will check programmatically.
-- **EBNF parses all example payloads in epic design doc** — grammar `payload` production covers the SQZPayload v1 shape from the design doc verbatim (field set, mode enum, target/files/lang, constraints, verbatim, confidence). Design-doc constraint strings (`behavior(new) = behavior(old)`, `minimal diff`) parse as `prose-clause`. All lexicon example clauses (e.g. `lint → build → test`, `Δ ["src/a.ts","src/b.ts"]`, `≋ fn normalize = fn old`) match `clause` productions. EBNF syntax checked: 45 productions, brackets/parens/braces balanced.
-- **Schema validates valid payloads, rejects malformed** — verified via `jq` structural checks mirroring schema semantics (ajv-cli also compiles the schema without errors and enforces `required`):
-  - 3 valid payloads (modes refactor/debug/docs incl. symbol-bearing constraints): PASS
-  - 8 malformed variants (v=2, bad mode, confidence>1, empty files, missing lang, non-string constraint, extra property, missing v): all REJECTED
-- **No verbatim text copied from nucleus repo** — all files written from epic design context; original grammar, original lexicon, original docs. See CITATIONS.md context.
+- **vitest suite green (mock providers)** — 4 files, **31 tests pass**, `npm test` clean; `tsc --noEmit` clean.
+- **roundtrip compress→expand lossless for hand cases** — refactor case (`≋`, `μ`, files), verbatim clause "Ship the new version" expands byte-for-byte, general-mode fallback, `Δ/∂/→/⏭` clause rendering, all-symbols expand.
+- **all error paths verified by tests** — retry+error injection (3 attempts, feedback message asserted), retry exhaustion → passthrough, non-JSON output → passthrough, provider throws → RuleProvider, unknown symbol literal + audit, provider `never throws`.
+- **token count for lexicon < 1000** — lexicon.md word+glyph count asserted < 1000 in `tests/lexicon.test.ts`.
 
 ## Interface contract (for downstream tasks)
 
-- `SQZPayload` v1 = `{ v: 1, mode, target{files[], lang}, constraints[], verbatim[], confidence }`
-- Symbol set: `Δ ≋ ∂ μ ⌁ → ✓ ⏭` (see `lexicon.md`)
-- `compress(prose, {domain?, lexicon})` must emit schema-conformant JSON; `expand(sqz, lexicon)` renders `verbatim[]` unchanged.
+- `SQZPayload` v1 + schema: see `sqz-schema.json` (math-dbr.1)
+- `Provider { name: string; generate(messages: ChatMessage[], schema: object): Promise<unknown> }` — returns JSON string or parsed object; non-conformant → retry ladder
+- `compress(prose, {domain?, lexicon, provider?, retries?}) → {sqz, verbatim, confidence, latencyMs}` (default provider = RuleProvider)
+- `expand(payload, lexicon, {audit?}) → prose` (audit array collects `unknown-symbol:<glyph>`)
+- Symbol set: `Δ ≋ ∂ μ ⌁ → ✓ ⏭` (lexicon.md)
+
+## Notes
+
+- Tests are permanent, co-located in `tests/`, native vitest (no scripted test languages, no temp files).
+- No git commit made (main session handles commits).

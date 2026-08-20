@@ -1,0 +1,18 @@
+{
+  "name": "math",
+  "version": "1.0.0",
+  "description": "SQZ — clean-room prompt-compression grammar + translation library",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "ajv": "^8.20.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}
