@@ -76,6 +76,77 @@ console.log(prose);
 console.log(audit); // [] — every symbol resolved
 ```
 
+## Prompt mutation
+
+SQZ mutates a prompt through three shapes, each lossless to the last:
+
+```
+prose  ──compress──▶  SQZ line  ──envelope──▶  model  ──expand──▶  prose
+```
+
+## Example 3 — mutate a prompt through compress/expand
+
+```ts
+import { compress, expand } from "./src/translator.js";
+import { DEFAULT_LEXICON, RuleProvider } from "./src/providers.js";
+
+const prompt =
+  "Debug src/parser.ts. Handle edge cases like empty input and null. Skip vendor/. Minimal diff.";
+
+const { sqz } = await compress(prompt, {
+  lexicon: DEFAULT_LEXICON,
+  provider: new RuleProvider(),
+});
+
+console.log(sqz); // debug Δ["src/parser.ts"] L:ts ∂(empty input, null) ⏭ vendor/ μ
+
+// Model runs on the compact line; expand restores the full prompt.
+console.log(expand(sqz, DEFAULT_LEXICON));
+// Debug src/parser.ts in ts.
+// Handle edge cases: empty input, null.
+// Skip: vendor/.
+// Minimal diff.
+```
+
+## Example 4 — full pipeline: envelope in, expanded prose out
+
+`processUserText` wraps the line in a `[SQZ v2]` envelope for the model; `processAssistantText` expands any `[SQZ v2]` block the model echoes back.
+
+```ts
+import { processUserText, processAssistantText } from "./src/plugin/core.js";
+import { DEFAULT_LEXICON, RuleProvider } from "./src/providers.js";
+import { compress, expand } from "./src/translator.js";
+
+const deps = {
+  compress,
+  expandFn: expand,
+  estimateTokens: (t: string) => t.split(/\s+/).length,
+  lexicon: DEFAULT_LEXICON,
+};
+
+// User prompt → SQZ envelope sent to the model.
+const user = await processUserText(
+  "Refactor src/a.ts and src/b.ts. Preserve behavior. Minimal diff.",
+  deps,
+  { threshold: 5, audit: false, includeLexicon: false, retries: 2 },
+);
+
+console.log(user.text);
+// [SQZ v2]
+// refactor Δ["src/a.ts","src/b.ts"] L:ts ≋ μ
+// [/SQZ]
+
+// Model replies with a compact SQZ line → expanded back to prose.
+const reply = '[SQZ v2]\ndocs Δ["src/a.ts"] L:ts ⌁\n[/SQZ]';
+const out = processAssistantText(reply, deps, { expand: true });
+console.log(out.expanded); // true
+console.log(out.text);
+// Write docs for src/a.ts in ts.
+// Coverage: complete.
+```
+
+`processUserText` is guarded by `estimateTokens >= threshold` and `confidence >= 0.9`; any failure returns the text byte-identical — prose is never mutated unless SQZ is confident.
+
 ## Failure ladder
 
 | Failure | Behavior |
