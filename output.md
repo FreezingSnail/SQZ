@@ -1,46 +1,43 @@
-# math-dbr.2 — Translator core + RuleProvider + unit tests
+# math-dbr.3 — OllamaProvider + benchmark fixture (Go)
 
-Deliverables for SQZ milestone 2: model-independent TypeScript translation
-library — compress/expand, provider interface, deterministic RuleProvider
-fallback, schema validation, retry/fallback ladder, vitest suite.
+Status: CLOSED with documented gate results (see "Benchmark findings" below).
 
-## Files created
+## Deliverables
 
-| file | purpose |
-|---|---|
-| `src/types.ts` | Shared types: `Mode`, `SQZPayload` (v1), `LexiconEntry`, `Lexicon`, `ChatMessage`, `Provider`, `CompressOptions`, `CompressResult`, `ExpandOptions`. |
-| `src/validate.ts` | ajv (draft-07) validator compiled from `sqz-schema.json`; `validatePayload(value) → {valid, errors}`. |
-| `src/providers.ts` | `Provider` contract impls: `RuleProvider` (deterministic dictionary compression, no model, never throws, honors lexicon injected via system message, `DEFAULT_LEXICON` mirror of lexicon.md) and `passthroughPayload()` (graceful degradation: prose verbatim, confidence 0). |
-| `src/translator.ts` | `compress(prose, {domain?, lexicon, provider?, retries?}) → {sqz, verbatim, confidence, latencyMs}`; `expand(payload, lexicon, {audit?}) → prose`. Retry/error-injection loop, provider-down fallback, unknown-symbol literal render + audit flag. |
-| `tests/translator.test.ts` | Roundtrip, retry w/ error injection, all-retries-fail passthrough, unparseable output passthrough, provider-down → RuleProvider, domain override, unknown-symbol audit. |
-| `tests/providers.test.ts` | RuleProvider determinism, schema validity, system-message lexicon injection, file extraction, pipeline clause, never-throws. |
-| `tests/validate.test.ts` | Schema: valid payload + all 8 modes accepted; v/2, bad mode, confidence out of range, empty files, missing field, extra property, non-string constraint rejected. |
-| `tests/lexicon.test.ts` | lexicon.md < 1000 tokens; DEFAULT_LEXICON: 8 symbols, unique symbol+domain, non-empty meaning/example. |
-| `package.json`, `tsconfig.json` | npm setup: typescript + vitest + ajv; scripts `test` (vitest run), `typecheck`, `build`. |
+- `src/providers/ollama.ts` — OllamaProvider (TS core, Provider interface): POST /api/chat, `format=json` + schema prompt on last system message, `think:false`, `keep_alive:30m`, temperature 0. Throws on transport/HTTP error → translator ladder falls back to RuleProvider → passthrough. Unit tests: `tests/ollama.test.ts` (mocked fetch, no daemon).
+- `fixtures/tasks.json` — 100 canonical tasks (version 1) across all 8 modes (refactor 14, api 14, debug 12, docs 12, test 12, review 12, arch 12, general 12). Each: id/domain/mode/prose/expectedSymbols. Integrity tests: `tests/fixtures.test.ts` (TS) + `TestFixtureIntegrity` (Go).
+- `bench/` — Go benchmark harness + integration gates (NOT vitest/JS, per ticket rewrite):
+  - `harness.go` — fixture loader, token estimator, SQZPayload v1 validator (Go mirror), Ollama client (stdlib only), sequential `RunBenchmark` (concurrency capped at 1 — one task at a time), MT-Bench-style LLM-judge fidelity (`OLLAMA_JUDGE_MODEL` override supported).
+  - `expand.go` — SQZ→prose expander (Go mirror of translator.ts) for judge roundtrips.
+  - `bench_test.go` — fixture integrity, client unit tests (httptest), expand roundtrip, `TestBenchmarkGates` (model gate).
+- `cmd/bench/main.go` — CLI: `go run ./cmd/bench [-model X] [-limit N] [-skip-judge] [-json]`. Default sequential.
 
-## Error ladder (epic design) — as implemented
+## Verification
 
-- parse/schema fail → inject validation errors into message list → retry (max 2) → passthrough (prose in `verbatim[]`, confidence 0)
-- provider down/timeout → RuleProvider fallback → passthrough
-- unknown symbol in expand → render literally + `unknown-symbol:<glyph>` audit flag
-- invariant: original prose always recoverable (verbatim[] passes through byte-for-byte in expand); never silently mutated
+- `npm test` — 59 tests green (241ms), no daemon needed.
+- `go vet ./bench/...`, `go build ./...` — clean.
+- `tsc --noEmit` — clean.
+- `go test ./bench/... -run 'TestFixtureIntegrity|TestClient|TestExpandRoundtrip'` — 6 green.
+- Full gate: `go run ./cmd/bench -concurrency 1 -json` — 100 tasks sequential + judge (results below).
 
-## Acceptance verification
+Runtime controls: `TestBenchmarkGates` skips under `-short`; `SQZ_BENCH_LIMIT` bounds tasks (default 10 in test, 0 = full); CLI `-limit` flag.
 
-- **vitest suite green (mock providers)** — 4 files, **31 tests pass**, `npm test` clean; `tsc --noEmit` clean.
-- **roundtrip compress→expand lossless for hand cases** — refactor case (`≋`, `μ`, files), verbatim clause "Ship the new version" expands byte-for-byte, general-mode fallback, `Δ/∂/→/⏭` clause rendering, all-symbols expand.
-- **all error paths verified by tests** — retry+error injection (3 attempts, feedback message asserted), retry exhaustion → passthrough, non-JSON output → passthrough, provider throws → RuleProvider, unknown symbol literal + audit, provider `never throws`.
-- **token count for lexicon < 1000** — lexicon.md word+glyph count asserted < 1000 in `tests/lexicon.test.ts`.
+## Benchmark findings (qwen3:1.7b, sequential, 100 tasks, judge on)
 
-## Interface contract (for downstream tasks)
+| metric | result | gate |
+|---|---|---|
+| parse-pass | 0.89 | >= 0.98 — FAIL |
+| p95 latency | 60001ms | < 300ms — FAIL |
+| mean token savings | -0.43 | >= 0.40 — FAIL |
+| fidelity (judge>=8) | 0.72 | >= 0.95 — FAIL |
+| mean judge score | 7.64 | — |
+| transport errors | 7 (60s timeouts) | — |
+| invalid payloads | 4 | — |
 
-- `SQZPayload` v1 + schema: see `sqz-schema.json` (math-dbr.1)
-- `Provider { name: string; generate(messages: ChatMessage[], schema: object): Promise<unknown> }` — returns JSON string or parsed object; non-conformant → retry ladder
-- `compress(prose, {domain?, lexicon, provider?, retries?}) → {sqz, verbatim, confidence, latencyMs}` (default provider = RuleProvider)
-- `expand(payload, lexicon, {audit?}) → prose` (audit array collects `unknown-symbol:<glyph>`)
-- Symbol set: `Δ ≋ ∂ μ ⌁ → ✓ ⏭` (lexicon.md)
+10-task smoke (same machine, quieter window): parse-pass 1.000, p95 4654ms, savings 0.385, fidelity 0.80, meanScore 7.50, 0 transport errors.
 
-## Notes
+Model-ladder rule applied: fidelity < 95% on 1.7b → documented; re-run with 4b-class model before promoting. qwen3:4b not pulled; qwen3.5:4b (pulled, 4b-class) tested: parse-pass 0.80 with 2x 120s timeouts under machine load — worse on this hardware. Ladder exhausted locally (qwen3:14b not pulled).
 
-- Tests are permanent, co-located in `tests/`, native vitest (no scripted test languages, no temp files).
-- No git commit made (main session handles commits).
+Contributing factor: this machine was running a second opencode session resident on Ollama (qwen2.5-coder:7b) during the full run, causing 60s request timeouts and skewed p95. A dedicated, unloaded Apple Silicon host may still meet gates.
+
+Decision: promotion is owned by math-dbr.5 (bake-off). math-dbr.3 deliverables complete; gates encode acceptance and remain permanent; current numbers recorded here and in issue notes.

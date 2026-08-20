@@ -1,0 +1,1504 @@
+{
+  "version": 1,
+  "count": 100,
+  "tasks": [
+    {
+      "id": "sqz-001",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/tokenizer.ts to extract token classification into its own module. The classification logic currently lives in a large switch statement that is hard to reason about; move it into a dedicated classifyToken() function with a table-driven implementation. Preserve the exact runtime behavior for every input, including the order in which token kinds are emitted, and keep error messages byte-for-byte identical so downstream log parsers stay unaffected. Keep the diff minimal and only modify files under src/. Handle edge cases such as empty input, unterminated strings, and lone surrogate pairs before the classification step. Do not touch tests/tokenizer.test.ts or any file outside the src/ directory, and do not add new dependencies on runtime globals. Verify the full test suite still passes after the refactor. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓"
+      ]
+    },
+    {
+      "id": "sqz-002",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/http/client.ts to use the new request pipeline instead of the legacy callback chain. The pipeline already supports middleware stages and retry hooks, so the refactor must route every existing call site through it while keeping the public API surface unchanged. Preserve the same behavior for timeouts, redirects, and connection pooling, and make sure backoff timing stays identical to today. Keep the diff minimal and restrict changes to src/http/ plus the shared types in src/types.ts. Handle edge cases such as aborted requests, DNS failures, and malformed redirect locations with the same error codes as before. Do not touch src/http/client.test.ts and leave the vendored TLS files untouched. Verify acceptance criteria: all existing integration tests pass and the latency profile shows no regression. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-003",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/store/index.ts to replace the manual index bookkeeping with the shared MapPool helper. The current code duplicates the eviction policy across three call sites; unify them so the LRU behavior is defined once. Preserve the exact same behavior for cache hits, misses, and eviction order, including the observable order of the keys() enumeration. Keep the change minimal and only touch src/store/ and the shared helper in src/util/. Handle edge cases such as concurrent access during resize, zero-capacity pools, and null keys the way the current implementation does. Do not change tests/store/index.test.ts and skip any changes to the persistence layer in src/store/persist.ts. Verify the memory profile stays within the same bounds and the public exports are unchanged. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓"
+      ]
+    },
+    {
+      "id": "sqz-004",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/parser/expr.ts so that operator precedence is driven by an explicit precedence table instead of nested if statements. The grammar does not change, and the parse tree shape must stay identical for every expression the current parser accepts. Preserve the same behavior for associativity, unary minus handling, and error positions reported in syntax errors. Keep the diff minimal and limit edits to src/parser/ plus its type declarations in src/parser/types.ts. Handle edge cases such as trailing operators, empty parentheses, and malformed number literals with the existing error messages. Do not touch tests/parser/expr.test.ts and leave the CLI entrypoint in src/cli/parse.ts untouched. Verify the golden parse tests still pass and the fuzz corpus reports no new findings. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓"
+      ]
+    },
+    {
+      "id": "sqz-005",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/metrics/registry.ts to make all metric types implement a common Collector interface so the dashboard backend can render them uniformly. Preserve the same behavior for label validation, cardinality limits, and the sort order of the exported snapshot. Keep the change minimal and only edit src/metrics/ and the dashboard model in src/dashboard/types.ts. Handle edge cases such as duplicate label names, missing value fields, and malformed histogram buckets exactly as the current code does. Do not touch tests/metrics/registry.test.ts and leave the Prometheus exporter in src/metrics/exporter.ts unchanged. Verify the serialized output for the example config is byte-identical and coverage of the metrics module stays complete. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-006",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/config/loader.ts to split the monolithic load() function into three stages: discovery, validation, and normalization. The split must not change which config files win when multiple sources exist, and the merge order must remain identical. Preserve the same behavior for environment variable precedence and unknown-key warnings. Keep the diff minimal and scope edits to src/config/ only. Handle edge cases such as missing config files, empty YAML documents, and malformed interpolation syntax with the current error messages. Do not touch tests/config/loader.test.ts and skip any changes to the schema definitions in src/config/schema.ts. Verify the example configs from docs/ still load unchanged and the validation failure list matches the existing snapshot. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-007",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/db/query.ts so that parameter binding is centralized in one helper instead of being repeated in every statement builder. The generated SQL must stay identical for all existing queries, including the numbering of positional parameters. Preserve the same behavior for NULL handling, array expansion, and the error raised when a parameter count mismatches. Keep the diff minimal and only change src/db/ and the shared bind types in src/db/types.ts. Handle edge cases such as empty parameter lists, nested arrays, and malformed placeholder syntax with the same failure modes. Do not touch tests/db/query.test.ts and leave the migration runner in src/db/migrate.ts untouched. Verify the query snapshot tests pass and the execution path keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-008",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/render/html.ts to generate markup through composable component functions rather than string concatenation. The rendered output must be identical for every existing template, including whitespace handling and attribute ordering. Preserve the same behavior for escaping rules and the error thrown on malformed attribute values. Keep the diff minimal and restrict edits to src/render/ and the template types in src/render/types.ts. Handle edge cases such as empty elements, void tags, and malformed nesting with the same output as today. Do not change tests/render/html.test.ts and leave the legacy template files in templates/ untouched. Verify the golden HTML fixtures still match and the snapshot suite provides complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-009",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/auth/session.ts to move token verification into its own verifyToken() function used by both the middleware and the API handlers. The verification logic must stay identical, including the exact clock-skew window and the error codes for expired and malformed tokens. Preserve the same behavior for refresh flows and the session revocation list. Keep the diff minimal and only touch src/auth/ and the middleware wiring in src/server/middleware.ts. Handle edge cases such as missing Authorization headers, empty token strings, and malformed base64 padding with the current responses. Do not touch tests/auth/session.test.ts and skip changes to the OAuth provider in src/auth/oauth.ts. Verify the security test suite passes and acceptance criteria for the auth flow are met. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓"
+      ]
+    },
+    {
+      "id": "sqz-010",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/cli/runner.ts so that command dispatch uses a declarative command table instead of a long switch chain. The help output, exit codes, and argument validation messages must stay identical for every existing command. Preserve the same behavior for flags that take multiple values and for the ordering of suggestions on unknown commands. Keep the diff minimal and only edit src/cli/ and the shared option types in src/cli/types.ts. Handle edge cases such as missing required flags, malformed short-flag bundles, and empty argument lists with the same diagnostics. Do not change tests/cli/runner.test.ts and leave the completion script in scripts/completions.sh untouched. Verify the CLI smoke tests pass and the golden help snapshots are unchanged. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓"
+      ]
+    },
+    {
+      "id": "sqz-011",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/queue/worker.ts to pull the job retry policy out of the processing loop and into a dedicated RetryPolicy object. The effective retry counts, backoff schedule, and dead-letter routing must stay identical for every job class currently registered. Preserve the same behavior for job cancellation and the ordering guarantee of the priority queue. Keep the diff minimal and scope changes to src/queue/ and the job definitions in src/jobs/. Handle edge cases such as jobs that fail with non-retryable errors, empty payloads, and malformed job arguments exactly as today. Do not touch tests/queue/worker.test.ts and leave the scheduler in src/queue/scheduler.ts unchanged. Verify the queue integration tests pass and the failure-injection suite keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-012",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/logger/format.ts so that structured field serialization is handled by one shared serializer used by both the console and file sinks. The output format must stay identical, including key ordering, quoting rules, and the representation of nested objects. Preserve the same behavior for circular reference detection and the truncation of oversized values. Keep the diff minimal and only touch src/logger/ and the sink wiring in src/logger/sinks.ts. Handle edge cases such as undefined fields, malformed stack traces, and empty log payloads with the same output as today. Do not change tests/logger/format.test.ts and skip changes to the JSON schema in src/logger/schema.json. Verify the golden log fixtures still match and the formatter tests provide complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-013",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/api/routes.ts to replace the flat route array with a route tree so that path parameters are resolved once at registration time. The resolved handler for every existing path must stay identical, including the order of middleware applied to nested groups. Preserve the same behavior for trailing-slash handling and the 404 response for unknown paths. Keep the diff minimal and only edit src/api/ and the router core in src/api/router.ts. Handle edge cases such as duplicate parameter names, empty path segments, and malformed route patterns with the current behavior. Do not touch tests/api/routes.test.ts and leave the OpenAPI generation in src/api/openapi.ts untouched. Verify the route snapshot tests pass and the request routing suite keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-014",
+      "domain": "refactor",
+      "mode": "refactor",
+      "prose": "Refactor src/validate/checks.ts so that all validation rules report issues through a common Issue type instead of throwing ad-hoc errors. The text, severity, and path of every reported issue must stay identical for all existing rules. Preserve the same behavior for rule ordering and the aggregation of multiple issues in one pass. Keep the diff minimal and restrict changes to src/validate/ and the issue types in src/validate/types.ts. Handle edge cases such as empty values, missing required fields, and malformed reference paths with the current messages. Do not touch tests/validate/checks.test.ts and leave the rule registry in src/validate/rules.ts unchanged. Verify the validation snapshot tests pass and the rule suite keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-015",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement a new endpoint GET /api/search with support for pagination, sorting, and field filtering in src/api/search.ts. The endpoint should stream results in pages of at most 50 items and accept sort, order, and filter query parameters with the same validation style used by the existing list endpoints. Preserve the existing response envelope shape with a meta block for pagination metadata. Keep the change minimal and only add the new handler, its route registration in src/api/routes.ts, and the request types in src/api/types.ts. Handle edge cases such as missing query strings, malformed sort fields, and empty result sets with 400 and 200 responses respectively. Do not touch the existing search index in src/index/search.ts and skip changes to the rate limiter middleware. Verify acceptance criteria: the new endpoint passes the contract tests and latency stays under the documented budget. Keep the diff minimal. Follow the documented pipeline stages. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-016",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement POST /api/uploads in src/api/uploads.ts to accept multipart file uploads with size and type validation. The handler should write the file to the staging bucket, record an upload object in the database, and return the upload id and presigned download URL. Preserve the existing authentication flow and the standard error envelope used by the rest of the API. Keep the change minimal and only add the handler, the route in src/api/routes.ts, and the upload model in src/db/models.ts. Handle edge cases such as oversized files, malformed multipart bodies, and empty payloads with the documented error codes. Do not touch the storage client in src/storage/client.ts and leave the webhook notifications in src/notify/webhooks.ts unchanged. Verify acceptance criteria: the upload contract test passes and the storage integration test covers the happy path end to end. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓"
+      ]
+    },
+    {
+      "id": "sqz-017",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement GET /api/audit-logs in src/api/audit.ts to return the last N audit entries filtered by actor, action, and time range. The endpoint must support cursor-based pagination so clients can page through large result sets without offset drift. Preserve the existing response envelope and the permission check that restricts access to admin roles. Keep the change minimal and only add the handler, the route registration in src/api/routes.ts, and the query helpers in src/db/audit.ts. Handle edge cases such as invalid cursor values, empty time ranges, and no matching entries with the standard error and empty-list responses. Do not touch the audit event producer in src/events/audit.ts and skip any changes to the admin middleware. Verify the endpoint satisfies the documented acceptance criteria and the pagination tests provide complete coverage. Keep the diff minimal. Follow the documented pipeline stages. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-018",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement PATCH /api/profiles/:id in src/api/profiles.ts to update partial profile fields using JSON merge patch semantics. Only fields present in the request body are modified, and unknown fields must be rejected with a 422 error naming the offending keys. Preserve the existing ownership check so users can only update their own profiles. Keep the change minimal and only add the handler, the route in src/api/routes.ts, and the update logic in src/db/profiles.ts. Handle edge cases such as empty patch bodies, malformed field values, and attempts to update read-only fields with the documented responses. Do not touch the profile schema in src/db/schema.ts and leave the avatar upload endpoint untouched. Verify the handler passes the contract tests and the update path has complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-019",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement DELETE /api/collections/:id in src/api/collections.ts to delete a collection and its member entries in a single transaction. The endpoint must return 204 on success and 404 when the collection does not exist or belongs to another tenant. Preserve the existing tenant isolation check and the soft-delete flag on the collection record. Keep the change minimal and only add the handler, the route in src/api/routes.ts, and the transactional delete in src/db/collections.ts. Handle edge cases such as already-deleted collections, malformed ids, and concurrent deletes with the documented responses and row-level locking. Do not touch the collection reader in src/api/collections.get.ts and skip changes to the search index refresh. Verify the delete endpoint passes the contract tests and the transaction path keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-020",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement GET /api/billing/usage in src/api/billing.ts to report current quota usage grouped by project and time bucket. The response must include the consumed units, the limit, and the reset timestamp for each bucket, matching the shape documented in the API reference. Preserve the existing authentication flow and the standard error envelope for unauthorized access. Keep the change minimal and only add the handler, the route in src/api/routes.ts, and the aggregation query in src/db/billing.ts. Handle edge cases such as projects without usage records, malformed time ranges, and empty bucket lists with the documented responses. Do not touch the billing meter in src/billing/meter.ts and leave the usage webhook unchanged. Verify the endpoint satisfies the documented acceptance criteria and the aggregation logic has complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-021",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement GET /api/health in src/api/health.ts to expose a readiness summary for the service and its dependencies. The response must include the service name, version, uptime, and a per-dependency status block with latency in milliseconds. Preserve the existing secret handling so the response never leaks internal addresses or tokens. Keep the change minimal and only add the handler, the route in src/api/routes.ts, and the dependency probe in src/deps/health.ts. Handle edge cases such as a downed database, malformed configuration, and missing version metadata with the documented degraded status codes. Do not touch the metrics endpoint in src/api/metrics.ts and skip changes to the load balancer probe script in scripts/healthcheck.sh. Verify the endpoint passes the contract tests and the probe logic keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-022",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement POST /api/webhooks in src/api/webhooks.ts to register a new webhook subscription with URL, event types, and a shared secret. The handler must validate the URL scheme and reachability before persisting the subscription, and must return the generated id and a test event delivery receipt. Preserve the existing event bus interface so subscribers keep receiving events without code changes. Keep the change minimal and only add the handler, the route in src/api/routes.ts, and the subscription model in src/db/webhooks.ts. Handle edge cases such as malformed URLs, empty event lists, and duplicate subscriptions with the documented responses. Do not touch the event dispatcher in src/events/dispatch.ts and leave the retry policy in src/events/retry.ts unchanged. Verify the registration flow passes the contract tests and the validation path has complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-023",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement GET /api/reports/:id/download in src/api/reports.ts to stream a previously generated report file with content-type detection and range request support. The endpoint must set the correct cache headers and return 404 for expired or missing reports. Preserve the existing permission model so only the report owner and workspace admins can download. Keep the change minimal and only add the handler, the route in src/api/routes.ts, and the file lookup in src/storage/reports.ts. Handle edge cases such as malformed range headers, empty files, and concurrent downloads with the documented responses. Do not touch the report generator in src/reports/generate.ts and skip changes to the storage bucket policy in src/storage/policy.ts. Verify the download endpoint passes the contract tests and the range logic keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-024",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement POST /api/export in src/api/export.ts to start an asynchronous export job that writes a snapshot of the requested resources to a downloadable archive. The handler must accept a resource filter, a format selector, and a callback URL, and must return the job id and initial status. Preserve the existing job queue semantics so the export runs with the same priority as other background work. Keep the change minimal and only add the handler, the route in src/api/routes.ts, and the job definition in src/jobs/export.ts. Handle edge cases such as empty filters, malformed format values, and callback URLs that fail validation with the documented responses. Do not touch the archive writer in src/archive/writer.ts and leave the job status endpoint untouched. Verify the export flow passes the contract tests and the job state machine has complete coverage. Keep the diff minimal. Follow the documented pipeline stages. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-025",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement GET /api/orgs/:id/members in src/api/orgs.ts to list organization members with their roles, invite status, and last active time. The endpoint must support cursor pagination and role filtering, and must enforce the existing membership check so only org admins can list members. Preserve the existing audit trail so membership reads are not logged as mutations. Keep the change minimal and only add the handler, the route in src/api/routes.ts, and the membership query in src/db/orgs.ts. Handle edge cases such as invalid cursors, malformed role filters, and orgs with no members with the documented responses. Do not touch the invite endpoint in src/api/invites.ts and skip changes to the role enum in src/types.ts. Verify the endpoint passes the contract tests and the filter logic keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-026",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement POST /api/chat/stream in src/api/chat.ts to open a streaming chat session that returns tokens incrementally over a server-sent events connection. The handler must accept a message history, a model selector, and a temperature option, and must emit metadata events before the first token. Preserve the existing streaming pipeline so token batching and heartbeat behavior stay consistent with the current SDK. Keep the change minimal and only add the handler, the route in src/api/routes.ts, and the stream writer in src/stream/sse.ts. Handle edge cases such as malformed history entries, unsupported model names, and client disconnects with the documented behaviors. Do not touch the model router in src/models/router.ts and leave the rate limiter untouched. Verify the endpoint passes the contract tests and the SSE writer keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-027",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement PUT /api/cache/keys/:key in src/api/cache.ts to upsert a cache entry with a TTL and an optional atomic compare-and-swap guard. The handler must honor the existing max entry size and must reject writes that exceed the quota with a 413 response. Preserve the existing cache client interface so the server and the CLI share the same storage backend. Keep the change minimal and only add the handler, the route in src/api/routes.ts, and the cache primitives in src/cache/entries.ts. Handle edge cases such as malformed TTL values, empty keys, and concurrent writes with the documented responses. Do not touch the cache eviction policy in src/cache/evict.ts and skip changes to the metrics counters in src/cache/metrics.ts. Verify the endpoint passes the contract tests and the CAS logic has complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-028",
+      "domain": "api",
+      "mode": "api",
+      "prose": "Implement GET /api/schemas in src/api/schemas.ts to return the list of versioned JSON schemas published by the service. The response must include the schema id, the latest version, and the set of deprecated versions, and must support filtering by domain. Preserve the existing schema registry semantics so consumers keep resolving the same versioned artifacts. Keep the change minimal and only add the handler, the route in src/api/routes.ts, and the registry query in src/schemas/registry.ts. Handle edge cases such as unknown domains, empty registries, and malformed filter values with the documented responses. Do not touch the schema validation in src/schemas/validate.ts and leave the publishing pipeline in src/schemas/publish.ts unchanged. Verify the endpoint passes the contract tests and the registry query keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-029",
+      "domain": "debug",
+      "mode": "debug",
+      "prose": "Debug the intermittent crash in src/worker/pool.ts that surfaces as a null pointer when tasks complete during pool drain. The pool occasionally races with the shutdown path, leaving the task result handler with a missing slot reference. Preserve the same behavior for normal task completion and keep the failure mode isolated to the drain race. Keep the fix minimal and limit changes to src/worker/ and the shared pool types in src/worker/types.ts. Handle edge cases such as rapid submit-then-drain sequences, empty pools, and malformed task payloads without changing the public API. Do not touch tests/worker/pool.test.ts and skip changes to the scheduler in src/worker/scheduler.ts. Verify the race reproducer passes repeatedly and the drain path keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-030",
+      "domain": "debug",
+      "mode": "debug",
+      "prose": "Debug the off-by-one error in src/range/split.ts that yields an empty tail slice when splitting ranges that divide evenly. The split function computes the boundary with a strict comparison and drops the final segment in exact-division cases. Preserve the same behavior for uneven splits and keep the return shape stable. Keep the fix minimal and only touch src/range/ and the range types in src/range/types.ts. Handle edge cases such as single-element ranges, empty inputs, and malformed boundary values with the documented results. Do not touch tests/range/split.test.ts and leave the range iterator in src/range/iterate.ts unchanged. Verify the property tests pass for all boundary combinations and the split logic has complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-031",
+      "domain": "debug",
+      "mode": "debug",
+      "prose": "Debug the silent data loss in src/sync/merge.ts where concurrent edits to the same document drop one side of the merge. The three-way merge incorrectly treats concurrent changes to the same field as identical and keeps only the local version. Preserve the same behavior for genuinely identical edits and for non-overlapping changes. Keep the fix minimal and only modify src/sync/ and the conflict model in src/sync/conflicts.ts. Handle edge cases such as null fields, empty documents, and malformed change sets with the existing conflict resolution rules. Do not touch tests/sync/merge.test.ts and skip changes to the conflict UI in src/ui/conflicts.tsx. Verify the concurrent-edit reproducer passes and the merge matrix keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-032",
+      "domain": "debug",
+      "mode": "debug",
+      "prose": "Debug the wrong timezone offset in src/time/format.ts that shifts displayed timestamps by one hour during daylight saving transitions. The formatter converts the instant to UTC before applying the local offset, so the wall clock shown to users is off around the transition dates. Preserve the same behavior for normal dates and keep the instant-based API unchanged. Keep the fix minimal and scope edits to src/time/ and the timezone table in src/time/zones.ts. Handle edge cases such as transition minutes, malformed zone names, and null instants with the documented output. Do not touch tests/time/format.test.ts and leave the scheduler in src/time/cron.ts untouched. Verify the transition snapshot tests pass and the formatting logic keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-033",
+      "domain": "debug",
+      "mode": "debug",
+      "prose": "Debug the memory leak in src/stream/reader.ts where backpressured chunks accumulate in an unbounded buffer when the consumer pauses for a long time. The high-water mark is never enforced once the pause flag is set, so memory grows until the process is restarted. Preserve the same behavior for normal flow and keep the pause-resume contract intact. Keep the fix minimal and only edit src/stream/ and the buffering types in src/stream/types.ts. Handle edge cases such as zero-byte chunks, malformed chunk boundaries, and rapid pause-resume toggling with the documented backpressure policy. Do not touch tests/stream/reader.test.ts and skip changes to the writer in src/stream/writer.ts. Verify the memory profile stays flat under the soak test and the backpressure path has complete coverage. Keep the diff minimal. Follow the documented pipeline stages. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-034",
+      "domain": "debug",
+      "mode": "debug",
+      "prose": "Debug the unhandled rejection in src/rpc/client.ts that crashes the process when a streaming RPC ends before the client finishes reading. The completion frame arrives while the client is still draining the response body, and the error path throws outside the promise chain. Preserve the same behavior for normal stream completion and keep the client API stable. Keep the fix minimal and only touch src/rpc/ and the frame decoder in src/rpc/frames.ts. Handle edge cases such as empty streams, malformed frame headers, and server-initiated cancellation with the documented error codes. Do not touch tests/rpc/client.test.ts and leave the server handler in src/rpc/server.ts unchanged. Verify the crash reproducer passes and the stream lifecycle keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-035",
+      "domain": "debug",
+      "mode": "debug",
+      "prose": "Debug the incorrect rounding in src/price/calc.ts where floating point arithmetic produces prices like 19.99 instead of 20.00 for percentage discounts. The calculation multiplies before rounding and loses precision on large quantities. Preserve the same behavior for integer price paths and keep the decimal types stable. Keep the fix minimal and only change src/price/ and the money helpers in src/price/money.ts. Handle edge cases such as zero discounts, malformed currency amounts, and negative totals with the documented rounding rules. Do not touch tests/price/calc.test.ts and skip changes to the tax module in src/price/tax.ts. Verify the rounding table tests pass and the calculation path keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-036",
+      "domain": "debug",
+      "mode": "debug",
+      "prose": "Debug the duplicate keys emitted by src/transform/flatten.ts when flattening nested objects that contain array indices that collide with existing keys. The flattener does not check for key collisions and silently overwrites earlier entries. Preserve the same behavior for collision-free objects and keep the flattened shape stable. Keep the fix minimal and scope edits to src/transform/ and the flatten options in src/transform/options.ts. Handle edge cases such as empty objects, malformed nested arrays, and null values with the documented collision policy. Do not touch tests/transform/flatten.test.ts and leave the unflatten helper in src/transform/unflatten.ts unchanged. Verify the collision reproducer passes and the flatten suite keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-037",
+      "domain": "debug",
+      "mode": "debug",
+      "prose": "Debug the stale reads in src/cache/lru.ts where a value written to the cache is not visible to readers on other threads until the next eviction cycle. The write path updates the shared map without publishing the new entry to the reader cache. Preserve the same behavior for eviction and keep the entry API stable. Keep the fix minimal and only modify src/cache/ and the entry types in src/cache/types.ts. Handle edge cases such as expired entries, malformed keys, and concurrent read-write races with the documented visibility policy. Do not touch tests/cache/lru.test.ts and skip changes to the TTL sweeper in src/cache/sweeper.ts. Verify the visibility reproducer passes and the cache suite keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-038",
+      "domain": "debug",
+      "mode": "debug",
+      "prose": "Debug the truncated output in src/render/markdown.ts where code blocks containing tabs are cut short when the block ends with an indented line. The parser treats the trailing indentation as a closing fence and drops the final code line. Preserve the same behavior for properly fenced blocks and keep the rendered HTML stable. Keep the fix minimal and only edit src/render/ and the tokenizer state in src/render/tokens.ts. Handle edge cases such as empty code blocks, malformed fence markers, and mixed indentation with the documented parse rules. Do not touch tests/render/markdown.test.ts and leave the table renderer in src/render/table.ts untouched. Verify the fixture tests pass and the parser path keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-039",
+      "domain": "debug",
+      "mode": "debug",
+      "prose": "Debug the incorrect retry delay in src/net/backoff.ts where the first retry fires immediately instead of after the configured initial delay. The scheduler computes the delay with a zero-based attempt counter, so the first retry gets a zero wait. Preserve the same behavior for subsequent retries and keep the cap on total backoff. Keep the fix minimal and scope changes to src/net/ and the retry policy in src/net/policy.ts. Handle edge cases such as negative delays, malformed policy values, and exhausted attempts with the documented behavior. Do not touch tests/net/backoff.test.ts and leave the circuit breaker in src/net/breaker.ts unchanged. Verify the timing tests pass and the retry logic keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-040",
+      "domain": "debug",
+      "mode": "debug",
+      "prose": "Debug the lost update in src/db/upsert.ts where two concurrent upserts of the same row end with only one of the writes persisted. The upsert uses a read-then-write sequence without a conditional guard on the version column. Preserve the same behavior for distinct rows and keep the result type stable. Keep the fix minimal and only touch src/db/ and the row types in src/db/types.ts. Handle edge cases such as missing rows, malformed version values, and concurrent deletes with the documented conflict responses. Do not touch tests/db/upsert.test.ts and skip changes to the migration runner in src/db/migrate.ts. Verify the concurrency reproducer passes and the upsert path keeps complete coverage. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "⌁"
+      ]
+    },
+    {
+      "id": "sqz-041",
+      "domain": "docs",
+      "mode": "docs",
+      "prose": "Write documentation for the environment-variable override behavior in src/config/loader.ts including the precedence order between flags, env vars, and the config file. Preserve the existing behavior of the system. Handle the edge case of an empty input and the boundary at the empty queue. Keep the diff minimal and do not touch src/config unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-042",
+      "domain": "docs",
+      "mode": "docs",
+      "prose": "Document the retry client in src/http/retry.ts covering the backoff algorithm, jitter bounds, and the idempotency guarantees. Preserve the existing behavior of the system. Handle the edge case of a null payload and the boundary at the maximum retry count. Keep the diff minimal and do not touch src/http unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-043",
+      "domain": "docs",
+      "mode": "docs",
+      "prose": "Write a guide for the WebSocket client in src/ws/client.ts focusing on reconnection semantics, heartbeat intervals, and the wire format. Preserve the existing behavior of the system. Handle the edge case of a malformed frame and the boundary at the bucket limit. Keep the diff minimal and do not touch src/ws unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-044",
+      "domain": "docs",
+      "mode": "docs",
+      "prose": "Write developer docs for the caching layer in src/cache/store.ts explaining invalidation, TTL resolution, and write-through behavior. Preserve the existing behavior of the system. Handle the edge case of a concurrent miss and the boundary at the cardinality ceiling. Keep the diff minimal and do not touch src/cache unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-045",
+      "domain": "docs",
+      "mode": "docs",
+      "prose": "Write documentation for the plugin registry in src/plugins/registry.ts covering registration order, lifecycle hooks, and the load-failure error contract. Preserve the existing behavior of the system. Handle the edge case of a partially applied migration and the boundary at the drain timeout. Keep the diff minimal and do not touch src/plugins unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-046",
+      "domain": "docs",
+      "mode": "docs",
+      "prose": "Document the job scheduler in src/scheduler/jobs.ts documenting queue ordering, retry policy, and dead-letter handling. Preserve the existing behavior of the system. Handle the edge case of a deleted flag mid-rollout and the boundary at the half-open breaker. Keep the diff minimal and do not touch src/scheduler unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-047",
+      "domain": "docs",
+      "mode": "docs",
+      "prose": "Write a guide for the event bus in src/events/bus.ts explaining publish/subscribe semantics, ordering, backpressure, and shutdown drain. Preserve the existing behavior of the system. Handle the edge case of a subscriber that panics and the boundary at the TTL expiry. Keep the diff minimal and do not touch src/events unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-048",
+      "domain": "docs",
+      "mode": "docs",
+      "prose": "Write developer docs for the feature-flag manager in src/flags/manager.ts covering evaluation order, rollout percentages, and staleness windows. Preserve the existing behavior of the system. Handle the edge case of a zero-capacity cache and the boundary at the zero-capacity limit. Keep the diff minimal and do not touch src/flags unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-049",
+      "domain": "docs",
+      "mode": "docs",
+      "prose": "Write documentation for the CLI in cmd/sqz/main.go documenting every flag, exit code, and output format with one worked example per subcommand. Preserve the existing behavior of the system. Handle the edge case of a missing required argument and the boundary at the unknown-field case. Keep the diff minimal and do not touch cmd/sqz unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff. See scripts/verify.sh.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-050",
+      "domain": "docs",
+      "mode": "docs",
+      "prose": "Document the build pipeline in .github/workflows/ci.yml describing each job, the caching strategy, and the promotion rules. Preserve the existing behavior of the system. Handle the edge case of an unknown flag and the boundary at the max-attempts ceiling. Keep the diff minimal and do not touch .github/workflows unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff. See scripts/verify.sh.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-051",
+      "domain": "docs",
+      "mode": "docs",
+      "prose": "Write a guide for the database schema in src/db/schema.ts describing every table and constraint and which columns are frozen for compatibility. Preserve the existing behavior of the system. Handle the edge case of a tampered cookie and the boundary at the staging threshold. Keep the diff minimal and do not touch src/db unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-052",
+      "domain": "docs",
+      "mode": "docs",
+      "prose": "Write developer docs for the static file handler in src/server/static.ts covering caching headers, etag behavior, and compression negotiation. Preserve the existing behavior of the system. Handle the edge case of a partial chunk and the boundary at the empty-config case. Keep the diff minimal and do not touch src/server unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-053",
+      "domain": "test",
+      "mode": "test",
+      "prose": "Write tests for the token estimator in src/tokens.ts covering empty input, unicode identifiers, symbol runs, and punctuation-only input. Preserve the existing behavior contract of the module. Handle the edge case of an empty input and the boundary at the empty queue. Keep the diff minimal and do not touch src unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-054",
+      "domain": "test",
+      "mode": "test",
+      "prose": "Add a test suite for the schema validator in src/validate.ts covering every rejection path: wrong types, missing fields, extra properties, invalid modes. Preserve the existing behavior contract of the module. Handle the edge case of a null payload and the boundary at the maximum retry count. Keep the diff minimal and do not touch src unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-055",
+      "domain": "test",
+      "mode": "test",
+      "prose": "Write unit tests for the retry client in src/http/retry.ts covering backoff schedule, jitter bounds, max-attempts ceiling, and the abort path. Preserve the existing behavior contract of the module. Handle the edge case of a malformed frame and the boundary at the bucket limit. Keep the diff minimal and do not touch src/http unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-056",
+      "domain": "test",
+      "mode": "test",
+      "prose": "Write tests for the SQZ payload expander in src/translator.ts covering every mode template, every constraint symbol, and the verbatim passthrough. Preserve the existing behavior contract of the module. Handle the edge case of a concurrent miss and the boundary at the cardinality ceiling. Keep the diff minimal and do not touch src unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-057",
+      "domain": "test",
+      "mode": "test",
+      "prose": "Add a test suite for the config loader in src/config/loader.ts covering precedence, default merging, invalid JSON, and unknown keys. Preserve the existing behavior contract of the module. Handle the edge case of a partially applied migration and the boundary at the drain timeout. Keep the diff minimal and do not touch src/config unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-058",
+      "domain": "test",
+      "mode": "test",
+      "prose": "Write unit tests for the cache store in src/cache/store.ts covering TTL expiry, concurrent writes, eviction order, and zero capacity. Preserve the existing behavior contract of the module. Handle the edge case of a deleted flag mid-rollout and the boundary at the half-open breaker. Keep the diff minimal and do not touch src/cache unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-059",
+      "domain": "test",
+      "mode": "test",
+      "prose": "Write tests for the job scheduler in src/scheduler/jobs.ts covering ordering, retries, the dead-letter path, and the empty queue. Preserve the existing behavior contract of the module. Handle the edge case of a subscriber that panics and the boundary at the TTL expiry. Keep the diff minimal and do not touch src/scheduler unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-060",
+      "domain": "test",
+      "mode": "test",
+      "prose": "Add a test suite for the CLI arg parser in cmd/sqz/flags.go covering every flag, combined short flags, invalid values, and missing arguments. Preserve the existing behavior contract of the module. Handle the edge case of a zero-capacity cache and the boundary at the zero-capacity limit. Keep the diff minimal and do not touch cmd/sqz unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff. See scripts/verify.sh.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-061",
+      "domain": "test",
+      "mode": "test",
+      "prose": "Write unit tests for the event bus in src/events/bus.ts covering ordering, fan-out, subscriber errors, and the shutdown drain. Preserve the existing behavior contract of the module. Handle the edge case of a missing required argument and the boundary at the unknown-field case. Keep the diff minimal and do not touch src/events unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-062",
+      "domain": "test",
+      "mode": "test",
+      "prose": "Write tests for the feature-flag manager in src/flags/manager.ts covering rollout buckets, staleness, unknown flags, and empty config. Preserve the existing behavior contract of the module. Handle the edge case of an unknown flag and the boundary at the max-attempts ceiling. Keep the diff minimal and do not touch src/flags unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-063",
+      "domain": "test",
+      "mode": "test",
+      "prose": "Add a test suite for the WebSocket client in src/ws/client.ts covering reconnect backoff, the attempts ceiling, heartbeats, and malformed frames. Preserve the existing behavior contract of the module. Handle the edge case of a tampered cookie and the boundary at the staging threshold. Keep the diff minimal and do not touch src/ws unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-064",
+      "domain": "test",
+      "mode": "test",
+      "prose": "Write unit tests for the event emitter in src/events/emitter.ts covering once semantics, listener errors, removal races, and empty listeners. Preserve the existing behavior contract of the module. Handle the edge case of a partial chunk and the boundary at the empty-config case. Keep the diff minimal and do not touch src/events unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-065",
+      "domain": "review",
+      "mode": "review",
+      "prose": "Review the streaming pipeline in src/stream/pipe.ts for backpressure correctness, error propagation, and cancellation leaks. Preserve the author intent where the design is sound. Handle the edge case of an empty input and the boundary at the empty queue. Keep the diff minimal and do not touch src/stream unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-066",
+      "domain": "review",
+      "mode": "review",
+      "prose": "Audit src/auth/session.ts for security issues around token rotation, expiry handling, and tampered cookies. Preserve the author intent where the design is sound. Handle the edge case of a null payload and the boundary at the maximum retry count. Keep the diff minimal and do not touch src/auth unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-067",
+      "domain": "review",
+      "mode": "review",
+      "prose": "Review the change in the database migration in migrations/002_add_index.sql for index ordering, locking behavior, and the rollback path. Preserve the author intent where the design is sound. Handle the edge case of a malformed frame and the boundary at the bucket limit. Keep the diff minimal and do not touch migrations unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff. See scripts/verify.sh.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-068",
+      "domain": "review",
+      "mode": "review",
+      "prose": "Review the graph traversal in src/graph/bfs.ts for visited-set handling, cycle detection, and the empty-graph boundary. Preserve the author intent where the design is sound. Handle the edge case of a concurrent miss and the boundary at the cardinality ceiling. Keep the diff minimal and do not touch src/graph unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-069",
+      "domain": "review",
+      "mode": "review",
+      "prose": "Audit the error-handling refactor in src/errors/handler.ts for message preservation and fallback logging behavior. Preserve the author intent where the design is sound. Handle the edge case of a partially applied migration and the boundary at the drain timeout. Keep the diff minimal and do not touch src/errors unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-070",
+      "domain": "review",
+      "mode": "review",
+      "prose": "Review the change in the concurrency change in src/pool/worker.ts for shutdown ordering, drain boundaries, and panic recovery. Preserve the author intent where the design is sound. Handle the edge case of a deleted flag mid-rollout and the boundary at the half-open breaker. Keep the diff minimal and do not touch src/pool unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-071",
+      "domain": "review",
+      "mode": "review",
+      "prose": "Review the serialization change in src/io/serialize.ts for versioning, unknown fields, and backward compatibility. Preserve the author intent where the design is sound. Handle the edge case of a subscriber that panics and the boundary at the TTL expiry. Keep the diff minimal and do not touch src/io unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-072",
+      "domain": "review",
+      "mode": "review",
+      "prose": "Audit the CLI refactor in cmd/sqz/main.go for exit-code stability and flag compatibility. Preserve the author intent where the design is sound. Handle the edge case of a zero-capacity cache and the boundary at the zero-capacity limit. Keep the diff minimal and do not touch cmd/sqz unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff. See scripts/verify.sh.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-073",
+      "domain": "review",
+      "mode": "review",
+      "prose": "Review the change in the caching change in src/cache/store.ts for TTL semantics, concurrent misses, and eviction fairness. Preserve the author intent where the design is sound. Handle the edge case of a missing required argument and the boundary at the unknown-field case. Keep the diff minimal and do not touch src/cache unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-074",
+      "domain": "review",
+      "mode": "review",
+      "prose": "Review the WebSocket heartbeat change in src/ws/client.ts for timeout math and close-frame handling. Preserve the author intent where the design is sound. Handle the edge case of an unknown flag and the boundary at the max-attempts ceiling. Keep the diff minimal and do not touch src/ws unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-075",
+      "domain": "review",
+      "mode": "review",
+      "prose": "Audit the test-suite refactor in tests/unit for lost assertions and unjustified skips. Preserve the author intent where the design is sound. Handle the edge case of a tampered cookie and the boundary at the staging threshold. Keep the diff minimal and do not touch the vendored files unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff. See scripts/verify.sh.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-076",
+      "domain": "review",
+      "mode": "review",
+      "prose": "Review the change in the dependency update in package.json for breaking changes and peer-dependency conflicts. Preserve the author intent where the design is sound. Handle the edge case of a partial chunk and the boundary at the empty-config case. Keep the diff minimal and do not touch package.js unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-077",
+      "domain": "arch",
+      "mode": "arch",
+      "prose": "Design the architecture for the plugin registry in src/plugins/registry.ts defining the interface, lifecycle hooks, and load-order contract. Preserve the existing public contract for all current callers. Handle the edge case of an empty input and the boundary at the empty queue. Keep the diff minimal and do not touch src/plugins unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-078",
+      "domain": "arch",
+      "mode": "arch",
+      "prose": "Architect the migration path for the config parser in src/config/loader.ts with a compatibility shim and rollback plan. Preserve the existing public contract for all current callers. Handle the edge case of a null payload and the boundary at the maximum retry count. Keep the diff minimal and do not touch src/config unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-079",
+      "domain": "arch",
+      "mode": "arch",
+      "prose": "Design the streaming pipeline in src/stream/pipe.ts specifying stage contracts, backpressure policy, and cancellation. Preserve the existing public contract for all current callers. Handle the edge case of a malformed frame and the boundary at the bucket limit. Keep the diff minimal and do not touch src/stream unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-080",
+      "domain": "arch",
+      "mode": "arch",
+      "prose": "Design the architecture for the event bus topology in src/events/bus.ts defining topic hierarchy, delivery guarantees, and drain order. Preserve the existing public contract for all current callers. Handle the edge case of a concurrent miss and the boundary at the cardinality ceiling. Keep the diff minimal and do not touch src/events unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-081",
+      "domain": "arch",
+      "mode": "arch",
+      "prose": "Architect the cache hierarchy in src/cache/store.ts defining L1/L2 responsibilities and the invalidation protocol. Preserve the existing public contract for all current callers. Handle the edge case of a partially applied migration and the boundary at the drain timeout. Keep the diff minimal and do not touch src/cache unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-082",
+      "domain": "arch",
+      "mode": "arch",
+      "prose": "Design the retry and circuit-breaker layer in src/http/retry.ts defining the state machine and cooldown policy. Preserve the existing public contract for all current callers. Handle the edge case of a deleted flag mid-rollout and the boundary at the half-open breaker. Keep the diff minimal and do not touch src/http unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-083",
+      "domain": "arch",
+      "mode": "arch",
+      "prose": "Design the architecture for the multi-tenant isolation model in src/db/schema.ts defining tenant keys, query scoping, and migration policy. Preserve the existing public contract for all current callers. Handle the edge case of a subscriber that panics and the boundary at the TTL expiry. Keep the diff minimal and do not touch src/db unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-084",
+      "domain": "arch",
+      "mode": "arch",
+      "prose": "Architect the graceful-shutdown sequence in src/server/main.ts specifying drain order and the hard-stop timeout. Preserve the existing public contract for all current callers. Handle the edge case of a zero-capacity cache and the boundary at the zero-capacity limit. Keep the diff minimal and do not touch src/server unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-085",
+      "domain": "arch",
+      "mode": "arch",
+      "prose": "Design the observability layer in src/metrics/collector.ts defining metric names, cardinality limits, and the flush pipeline. Preserve the existing public contract for all current callers. Handle the edge case of a missing required argument and the boundary at the unknown-field case. Keep the diff minimal and do not touch src/metrics unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-086",
+      "domain": "arch",
+      "mode": "arch",
+      "prose": "Design the architecture for the feature-flag evaluation path in src/flags/manager.ts defining cache hierarchy and staleness policy. Preserve the existing public contract for all current callers. Handle the edge case of an unknown flag and the boundary at the max-attempts ceiling. Keep the diff minimal and do not touch src/flags unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-087",
+      "domain": "arch",
+      "mode": "arch",
+      "prose": "Architect the data-export pipeline in src/export/writer.ts specifying chunking, retry, and idempotency semantics. Preserve the existing public contract for all current callers. Handle the edge case of a tampered cookie and the boundary at the staging threshold. Keep the diff minimal and do not touch src/export unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-088",
+      "domain": "arch",
+      "mode": "arch",
+      "prose": "Design the module boundaries for the scheduler in src/scheduler/jobs.ts defining queue, runner, and policy interfaces. Preserve the existing public contract for all current callers. Handle the edge case of a partial chunk and the boundary at the empty-config case. Keep the diff minimal and do not touch src/scheduler unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-089",
+      "domain": "general",
+      "mode": "general",
+      "prose": "General task: add a debug flag to the CLI in cmd/sqz/main.go that prints the resolved config after all overrides. Preserve the existing runtime behavior. Handle the edge case of an empty input and the boundary at the empty queue. Keep the diff minimal and do not touch cmd/sqz unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff. See scripts/verify.sh.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-090",
+      "domain": "general",
+      "mode": "general",
+      "prose": "Task: introduce a truncation utility in src/utils/truncate.ts that splits strings at grapheme boundaries. Preserve the existing runtime behavior. Handle the edge case of a null payload and the boundary at the maximum retry count. Keep the diff minimal and do not touch src/utils unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-091",
+      "domain": "general",
+      "mode": "general",
+      "prose": "Implement add a request id header to the HTTP middleware in src/http/middleware.ts generating ids when absent. Preserve the existing runtime behavior. Handle the edge case of a malformed frame and the boundary at the bucket limit. Keep the diff minimal and do not touch src/http unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-092",
+      "domain": "general",
+      "mode": "general",
+      "prose": "General task: add structured logging to src/log/logger.ts with a JSON formatter option alongside the default text format. Preserve the existing runtime behavior. Handle the edge case of a concurrent miss and the boundary at the cardinality ceiling. Keep the diff minimal and do not touch src/log unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-093",
+      "domain": "general",
+      "mode": "general",
+      "prose": "Task: add a health endpoint to src/server/routes.ts returning status and version. Preserve the existing runtime behavior. Handle the edge case of a partially applied migration and the boundary at the drain timeout. Keep the diff minimal and do not touch src/server unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-094",
+      "domain": "general",
+      "mode": "general",
+      "prose": "Implement add a backup stage to scripts/migrate.sh that snapshots the database before applying migrations. Preserve the existing runtime behavior. Handle the edge case of a deleted flag mid-rollout and the boundary at the half-open breaker. Keep the diff minimal and do not touch scripts unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-095",
+      "domain": "general",
+      "mode": "general",
+      "prose": "General task: add a token-bucket rate limiter to the auth middleware in src/auth/middleware.ts with configurable burst. Preserve the existing runtime behavior. Handle the edge case of a subscriber that panics and the boundary at the TTL expiry. Keep the diff minimal and do not touch src/auth unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-096",
+      "domain": "general",
+      "mode": "general",
+      "prose": "Task: add the v2 release section to CHANGELOG.md summarizing breaking changes and new features. Preserve the existing runtime behavior. Handle the edge case of a zero-capacity cache and the boundary at the zero-capacity limit. Keep the diff minimal and do not touch CHANGELOG.md unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-097",
+      "domain": "general",
+      "mode": "general",
+      "prose": "Add a verification target to the Makefile that runs lint, build, and the full test suite in stages. Preserve the existing runtime behavior. Handle the edge case of a missing required argument and the boundary at the unknown-field case. Keep the diff minimal and do not touch the vendored files unless the pipeline requires it. Verify the result against the acceptance criteria before closing. the change touches files under src/ and docs/ Keep the diff minimal. Make the change a minimal diff. See scripts/verify.sh.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-098",
+      "domain": "general",
+      "mode": "general",
+      "prose": "General task: add gzip compression to the static file handler in src/server/static.ts when the client advertises support. Preserve the existing runtime behavior. Handle the edge case of an unknown flag and the boundary at the max-attempts ceiling. Keep the diff minimal and do not touch src/server unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-099",
+      "domain": "general",
+      "mode": "general",
+      "prose": "Task: add a pre-commit hook in .githooks/pre-commit that runs the type checker. Preserve the existing runtime behavior. Handle the edge case of a tampered cookie and the boundary at the staging threshold. Keep the diff minimal and do not touch the vendored files unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff. See scripts/verify.sh.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    },
+    {
+      "id": "sqz-100",
+      "domain": "general",
+      "mode": "general",
+      "prose": "Implement add a seed script in scripts/seed.ts that populates the development database. Preserve the existing runtime behavior. Handle the edge case of a partial chunk and the boundary at the empty-config case. Keep the diff minimal and do not touch scripts unless the pipeline requires it. Verify the result against the acceptance criteria before closing. Keep the diff minimal. Make the change a minimal diff.",
+      "expectedSymbols": [
+        "Δ",
+        "≋",
+        "μ",
+        "∂",
+        "⏭",
+        "✓",
+        "→"
+      ]
+    }
+  ]
+}
