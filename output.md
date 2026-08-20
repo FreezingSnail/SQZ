@@ -1,41 +1,39 @@
-# math-dbr.5 — Model bake-off and default promotion
+# SQZ v2 — plain-line payload (math-dbr.7)
 
-Status: CLOSED.
+## What changed
 
-## Summary
+v1 compress emitted a JSON envelope (`{"v":1,"mode":...,"target":{...},"constraints":[...],"verbatim":[...],"confidence":...}`) validated by JSON Schema, with `format:json` structured generation. Measured on qwen3:1.7b: **token savings −0.43** (envelope larger than prose) and ~2-5s per compress (schema in prompt + long JSON decode + parse retries).
 
-Empirical model selection via the bench harness (bench/, math-dbr.3) against
-`fixtures/tasks.json` (100 tasks), sequential (concurrency=1). Full report:
-`bakeoff.md` (repo root).
+v2 drops the envelope entirely. The wire format is **one plain SQZ line**:
 
-## Results (run under Ollama contention — second opencode session sharing daemon)
+```
+refactor Δ["src/a.ts"] L:ts ≋ μ ∂ v"keep log messages identical"
+```
 
-| Model | Tasks | Parse-pass | Fidelity | Mean score | p95 | Savings | Judged |
-|---|---|---|---|---|---|---|---|
-| **qwen3:1.7b** | 100 | 0.89 | 0.719 | 7.64 | 90s (capped) | -0.43 | 89/100 |
-| qwen3.5:4b | 10 | 0.80 | 1.000 (n=8) | 8.25 | 90s (capped) | -0.05 | 8/10 |
-| qwen3:4b / gemma4:e4b / granite4.1:3b | — | skipped — not pulled (multi-GB) | | | | | |
-| Apple AFM | — | skipped — no bridge (math-dbr.6) | | | | | |
+- No JSON, no schema prompt, no `format:json` — plain text generation
+- Validation = local grammar check (microseconds, zero model roundtrips)
+- Lossless policy intact: unencodable clauses go into `v"..."` verbatim segments
+- Lexicon still injected once per session; per-message payload is just the line
 
-Judge: `qwen3:1.7b` (OLLAMA_JUDGE_MODEL) for all runs — fast/reliable; same
-judge across candidates.
+## Files
 
-## Promoted default
-
-**qwen3:1.7b** (unchanged). No candidate passes fidelity gate >=95%; winner on
-latency/reliability (qwen3.5:4b: 20% transport timeouts at 10 tasks). Re-run on
-unloaded hardware recommended; if fidelity still <95%, pull qwen3:4b (next
-ladder rung) and re-test.
+- `src/line.ts` — v2 line tokenizer + AST (new)
+- `src/translator.ts` — compress → SQZLine; expand(line); grammar retry ladder
+- `src/validate.ts` — validateLine (local grammar) + validatePayload (v1, tooling-only)
+- `src/providers.ts` — RuleProvider emits lines; passthroughLine
+- `src/providers/ollama.ts` — generate(messages, schema?) — plain text when schema omitted
+- `src/plugin/format.ts` / `core.ts` — `[SQZ v2]` block carries the line; marker-only detection (no bare-JSON scanning)
+- `sqz.ebnf` — v2 line grammar; v1 payload grammar marked tooling-only
+- Tests: translator/providers/validate/plugin suites updated to v2 + new grammar tests
 
 ## Verification
 
-- `go test ./bench/... -short` — ok
-- `go vet ./bench/...` — clean
-- bakeoff.md written; result recorded via `bd remember`
-  (bakeoff-math-dbr-5-...) and epic notes (`bd update math-dbr`).
+- `npm test`: 148/148 green (1.1s)
+- `npx tsc --noEmit`: clean
+- Roundtrip lossless via RuleProvider (hand cases)
+- validateLine: 10k validations < 1s (measured in test)
 
-## Usage
+## Next
 
-```
-OLLAMA_JUDGE_MODEL=qwen3:1.7b go run ./cmd/bench -model qwen3:1.7b -timeout 90s -json
-```
+math-dbr.8: bench v2 (Go harness → plain-line metrics) + re-bake-off on qwen3:1.7b.
+Expect: positive savings (line < prose), sub-second compress latency, simpler grammar pass rate.

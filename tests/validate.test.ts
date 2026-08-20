@@ -1,9 +1,12 @@
 /**
- * SQZPayload schema validator tests (ajv against sqz-schema.json).
+ * Validation tests.
+ * validatePayload — ajv against sqz-schema.json (v1, tooling-only).
+ * validateLine — v2 plain-line grammar (the wire format).
  */
 
 import { describe, expect, it } from "vitest";
-import { validatePayload } from "../src/validate.js";
+import { validateLine, validatePayload } from "../src/validate.js";
+import { DEFAULT_LEXICON } from "../src/providers.js";
 import type { SQZPayload } from "../src/types.js";
 
 const VALID: SQZPayload = {
@@ -65,5 +68,68 @@ describe("validatePayload", () => {
     expect(valid).toBe(false);
     expect(errors.length).toBeGreaterThan(0);
     expect(errors.join(" ")).toMatch(/v/);
+  });
+});
+
+describe("validateLine (v2 wire format)", () => {
+  const VALID_LINE = 'refactor Δ["src/a.ts"] L:ts ≋ μ ∂ v"raw prose"';
+
+  it("accepts a valid line", () => {
+    const { valid, errors } = validateLine(VALID_LINE, DEFAULT_LEXICON);
+    expect(valid, errors.join("; ")).toBe(true);
+  });
+
+  it("accepts every mode as the leading token", () => {
+    for (const mode of ["refactor", "api", "debug", "docs", "test", "review", "arch", "general"]) {
+      const { valid, errors } = validateLine(`${mode} Δ["src/a.ts"]`, DEFAULT_LEXICON);
+      expect(valid, errors.join("; ")).toBe(true);
+    }
+  });
+
+  it("rejects empty lines", () => {
+    expect(validateLine("", DEFAULT_LEXICON).valid).toBe(false);
+  });
+
+  it("rejects missing mode", () => {
+    expect(validateLine('Δ["src/a.ts"] μ', DEFAULT_LEXICON).valid).toBe(false);
+  });
+
+  it("rejects unknown mode", () => {
+    expect(validateLine('bogus Δ["src/a.ts"]', DEFAULT_LEXICON).valid).toBe(false);
+  });
+
+  it("rejects missing Δ target", () => {
+    expect(validateLine("refactor μ", DEFAULT_LEXICON).valid).toBe(false);
+  });
+
+  it("rejects Δ target with no files", () => {
+    expect(validateLine('refactor Δ[]', DEFAULT_LEXICON).valid).toBe(false);
+  });
+
+  it("rejects unknown symbols", () => {
+    const { valid, errors } = validateLine('refactor Δ["src/a.ts"] λ', DEFAULT_LEXICON);
+    expect(valid).toBe(false);
+    expect(errors.join(" ")).toMatch(/unknown symbol|unexpected token/);
+  });
+
+  it("rejects unbalanced brackets", () => {
+    expect(validateLine('refactor Δ["src/a.ts"] ∂[unclosed', DEFAULT_LEXICON).valid).toBe(false);
+  });
+
+  it("rejects unterminated quote", () => {
+    expect(validateLine('refactor Δ["src/a.ts] v"oops', DEFAULT_LEXICON).valid).toBe(false);
+  });
+
+  it("rejects stray tokens", () => {
+    expect(validateLine('refactor Δ["src/a.ts"] gazonk', DEFAULT_LEXICON).valid).toBe(false);
+  });
+
+  it("is microsecond-fast (no network, no model)", () => {
+    const start = performance.now();
+    for (let i = 0; i < 10_000; i++) {
+      validateLine(VALID_LINE, DEFAULT_LEXICON);
+    }
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(1000); // 10k validations well under 1s
   });
 });

@@ -1,9 +1,10 @@
 /**
- * Squeeze plugin e2e session harness tests — full session transcript without
- * a live opencode process or model (RuleProvider + mocks only).
+ * Squeeze plugin e2e session harness tests (v2) — full session transcript
+ * without a live opencode process or model (RuleProvider + mocks only).
+ * Wire format: plain SQZ line inside the [SQZ v2] block.
  *
  * Acceptance mapping:
- *   - user prose in → compressed payload to model → expanded output to user
+ *   - user prose in → compressed line to model → expanded output to user
  *   - audit mode round-trips original text
  *   - kill-switch config leaves session byte-identical to no-plugin
  *   - all failure paths fall back to prose
@@ -15,18 +16,12 @@ import { loadConfig } from "../../src/plugin/config.js";
 import { makeDeps } from "../../src/plugin/squeeze.js";
 import { parseEnvelope } from "../../src/plugin/format.js";
 import { DEFAULT_LEXICON } from "../../src/providers.js";
-import type { SQZPayload } from "../../src/types.js";
+import type { SQZLine } from "../../src/types.js";
 
 const PROSE = "Refactor the tokenizer in src/tokenizer.ts. Preserve runtime behavior. Minimal diff.";
 
-const MODEL_SQZ_REPLY: SQZPayload = {
-  v: 1,
-  mode: "debug",
-  target: { files: ["src/main.ts"], lang: "ts" },
-  constraints: ["∂ (empty input, null)", "μ"],
-  verbatim: ["Keep the retry loop"],
-  confidence: 0.95,
-};
+const MODEL_SQZ_REPLY: SQZLine =
+  'debug Δ["src/main.ts"] L:ts ∂[(empty input, null)] μ v"Keep the retry loop"';
 
 function harnessFor(options: Record<string, unknown> = {}) {
   const config = loadConfig({ enabled: true, provider: "rule", threshold: 5, ...options });
@@ -39,18 +34,18 @@ function harnessFor(options: Record<string, unknown> = {}) {
 }
 
 describe("e2e session — happy path", () => {
-  it("user prose in → compressed payload to model → expanded output to user", async () => {
+  it("user prose in → compressed line to model → expanded output to user", async () => {
     const h = harnessFor();
-    const turn = await h.turn(PROSE, `[SQZ v1]\n${JSON.stringify(MODEL_SQZ_REPLY)}\n[/SQZ]`);
+    const turn = await h.turn(PROSE, `[SQZ v2]\n${MODEL_SQZ_REPLY}\n[/SQZ]`);
 
     // 1. user prose in
     expect(turn.userProse).toBe(PROSE);
 
-    // 2. compressed payload to model (envelope, not prose; first message has lexicon)
-    expect(turn.modelInput).toContain("[SQZ v1]");
+    // 2. compressed line to model (envelope, not prose; first message has lexicon)
+    expect(turn.modelInput).toContain("[SQZ v2]");
     expect(turn.modelInput).toContain("[SQZ lexicon]");
     const parts = parseEnvelope(turn.modelInput);
-    expect(parts.payload?.mode).toBe("refactor");
+    expect(parts.line).toMatch(/^refactor\b/);
     expect(parts.lexicon).toEqual(DEFAULT_LEXICON);
 
     // 3. expanded output to user
@@ -78,7 +73,7 @@ describe("e2e session — audit mode", () => {
     expect(turn.modelInput).toContain(PROSE);
     const parts = parseEnvelope(turn.modelInput);
     expect(parts.original).toBe(PROSE);
-    expect(parts.payload).toBeDefined();
+    expect(parts.line).toBeDefined();
   });
 });
 
@@ -148,9 +143,9 @@ describe("e2e session — failure paths fall back to prose", () => {
     });
     const turn = await h.turn(
       PROSE,
-      `[SQZ v1]\n${JSON.stringify({ ...MODEL_SQZ_REPLY, constraints: ["∂ (empty input)"] })}\n[/SQZ]`,
+      `[SQZ v2]\ndebug Δ["src/main.ts"] L:ts ∂[(empty input)]\n[/SQZ]`,
     );
-    expect(turn.userOutput).toContain("∂ (empty input)"); // rendered literally
+    expect(turn.userOutput).toContain("∂"); // rendered literally
   });
 });
 
@@ -162,7 +157,7 @@ describe("e2e session — savings sanity", () => {
       "and that you make the smallest possible change to the code.";
     const h = harnessFor();
     const turn = await h.turn(verbose, "ok");
-    expect(turn.modelInput).toContain("[SQZ v1]");
+    expect(turn.modelInput).toContain("[SQZ v2]");
     // Model input excludes the ~800-token lexicon after the first message.
     const second = await h.turn(verbose, "ok");
     expect(second.modelInput.length).toBeLessThan(verbose.length);

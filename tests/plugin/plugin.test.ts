@@ -43,7 +43,7 @@ describe("chat.message pre hook", () => {
     await hooks["chat.message"]!({ sessionID: "s1" }, output);
 
     expect(output.parts[0].type).toBe("text");
-    expect(output.parts[0].text).toContain("[SQZ v1]");
+    expect(output.parts[0].text).toContain("[SQZ v2]");
     expect(output.parts[0].text).toContain("[/SQZ]");
   });
 
@@ -87,7 +87,7 @@ describe("chat.message pre hook", () => {
     };
     await hooks["chat.message"]!({ sessionID: "s1" }, output);
     expect(output.parts[0].text).toBe("```ts\nconst x = 1\n```");
-    expect(output.parts[1].text).toContain("[SQZ v1]");
+    expect(output.parts[1].text).toContain("[SQZ v2]");
   });
 
   it("assistant role in chat.message is ignored", async () => {
@@ -102,14 +102,7 @@ describe("chat.message pre hook", () => {
 });
 
 describe("experimental.chat.messages.transform post hook", () => {
-  const PAYLOAD = {
-    v: 1,
-    mode: "debug",
-    target: { files: ["src/main.ts"], lang: "ts" },
-    constraints: ["∂ (empty input, null)"],
-    verbatim: [],
-    confidence: 0.95,
-  };
+  const LINE = 'debug Δ["src/main.ts"] L:ts ∂[(empty input, null)]';
 
   function assistantHistory(sqzText: string) {
     return {
@@ -124,7 +117,7 @@ describe("experimental.chat.messages.transform post hook", () => {
 
   it("expands SQZ in assistant parts to prose in place", async () => {
     const hooks = await loadPlugin({ enabled: true, provider: "rule", threshold: 5 });
-    const sqz = `Plan:\n[SQZ v1]\n${JSON.stringify(PAYLOAD)}\n[/SQZ]\nDone.`;
+    const sqz = `Plan:\n[SQZ v2]\n${LINE}\n[/SQZ]\nDone.`;
     const output = assistantHistory(sqz);
     await hooks["experimental.chat.messages.transform"]!({}, output);
     expect(output.messages[0].parts[0].text).toContain("Debug src/main.ts in ts.");
@@ -134,7 +127,7 @@ describe("experimental.chat.messages.transform post hook", () => {
 
   it("expand toggle off → assistant text byte-identical", async () => {
     const hooks = await loadPlugin({ enabled: true, provider: "rule", threshold: 5, expand: false });
-    const sqz = `[SQZ v1]\n${JSON.stringify(PAYLOAD)}\n[/SQZ]`;
+    const sqz = `[SQZ v2]\n${LINE}\n[/SQZ]`;
     const output = assistantHistory(sqz);
     await hooks["experimental.chat.messages.transform"]!({}, output);
     expect(output.messages[0].parts[0].text).toBe(sqz);
@@ -169,7 +162,7 @@ describe("degradation — plugin never blocks or corrupts", () => {
     const hooks = await loadPlugin({ enabled: true, provider: "no-such-provider", threshold: 5 });
     const output = userOutput(PROSE);
     await hooks["chat.message"]!({ sessionID: "s1" }, output);
-    expect(output.parts[0].text).toContain("[SQZ v1]"); // rule fallback still compressed
+    expect(output.parts[0].text).toContain("[SQZ v2]"); // rule fallback still compressed
   });
 
   it("hook wiring never double-compresses an existing envelope", async () => {

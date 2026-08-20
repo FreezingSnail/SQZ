@@ -118,16 +118,22 @@ export class OllamaProvider implements Provider {
   }
 
   /**
-   * POST /api/chat with format=json + schema prompt.
+   * POST /api/chat.
+   *
+   * v2 compress path (schema omitted): plain text, no format:json, no schema
+   * prompt — the small model emits one raw SQZ line (fast, few tokens).
+   *
+   * Legacy JSON path (schema given, judge-style calls): format=json + schema
+   * prompt appended to the system message.
+   *
    * Resolves to the parsed JSON object, or the raw content string when
    * unparseable (translator.normalize() decides). Throws on transport error,
    * timeout, or non-OK HTTP status → translator falls back to RuleProvider.
    */
-  async generate(messages: ChatMessage[], schema: object): Promise<unknown> {
-    const body = {
+  async generate(messages: ChatMessage[], schema?: object): Promise<unknown> {
+    const body: Record<string, unknown> = {
       model: this.model,
-      messages: withSchemaPrompt(messages, schema),
-      format: "json",
+      messages: schema ? withSchemaPrompt(messages, schema) : messages,
       stream: false,
       // Reasoning models (qwen3.5+) emit chain-of-thought by default; disable
       // it for low-latency structured output. Ignored by non-thinking models.
@@ -136,6 +142,9 @@ export class OllamaProvider implements Provider {
       keep_alive: "30m",
       options: { temperature: this.temperature },
     };
+    if (schema) {
+      body.format = "json";
+    }
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);

@@ -33,6 +33,10 @@ export interface SQZTarget {
   lang: string;
 }
 
+/**
+ * SQZPayload (v1) — retained as tooling-only schema (sqz-schema.json). NOT
+ * on the wire since v2: the compress path emits a plain SQZLine instead.
+ */
 export interface SQZPayload {
   v: 1;
   mode: Mode;
@@ -41,6 +45,13 @@ export interface SQZPayload {
   verbatim: string[];
   confidence: number;
 }
+
+/**
+ * SQZLine (v2 wire format) — one plain line of symbols, no JSON envelope.
+ * Grammar (sqz.ebnf v2): <mode> Δ["f1","f2"] [L:<lang>] <symbol>[op]... v"..."
+ * Example: refactor Δ["src/a.ts"] L:ts ≋ μ ∂ v"keep log messages identical"
+ */
+export type SQZLine = string;
 
 /** Lexicon entry: one symbol, one meaning, one domain (see lexicon.md). */
 export interface LexiconEntry {
@@ -59,12 +70,13 @@ export interface ChatMessage {
 
 /**
  * Model-independent provider contract.
- * generate() must return either a JSON-string or a parsed object conforming to
- * `schema`; anything else is treated as invalid by the retry/fallback logic.
+ * generate() returns either a parsed object (when `schema` is given — legacy
+ * JSON path, still used for judge-style calls) or a raw SQZ line (when
+ * `schema` is omitted — v2 plain-text compress path).
  */
 export interface Provider {
   name: string;
-  generate(messages: ChatMessage[], schema: object): Promise<unknown>;
+  generate(messages: ChatMessage[], schema?: object): Promise<unknown>;
 }
 
 export interface CompressOptions {
@@ -79,7 +91,8 @@ export interface CompressOptions {
 }
 
 export interface CompressResult {
-  sqz: SQZPayload;
+  /** v2: plain SQZ line (no JSON envelope). */
+  sqz: SQZLine;
   /** Raw prose clauses that could not be encoded — preserved unchanged. */
   verbatim: string[];
   /** Compressor self-reported intent-preservation probability (0..1). */

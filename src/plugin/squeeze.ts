@@ -108,7 +108,7 @@ export const SqueezePlugin: Plugin = async (input, options: PluginOptions = {}) 
           if (outcome.compressed) {
             part.text = outcome.text;
             deps.log?.(
-              `compressed user message (mode=${outcome.payload?.mode ?? "?"}, ` +
+              `compressed user message (line=${outcome.line ?? "?"}, ` +
                 `tokens=${deps.estimateTokens(part.text)})`,
             );
           }

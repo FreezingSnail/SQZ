@@ -1,7 +1,8 @@
 /**
- * Squeeze plugin core tests: threshold gate, envelope building, audit mode,
- * confidence gate, every failure path → original prose unchanged, assistant
- * expansion + expand toggle, unknown-symbol audit passthrough.
+ * Squeeze plugin core tests (v2): threshold gate, envelope building, audit
+ * mode, confidence gate, every failure path → original prose unchanged,
+ * assistant expansion + expand toggle, unknown-symbol audit passthrough.
+ * Wire format: plain SQZ line inside the [SQZ v2] block.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -9,14 +10,14 @@ import {
   MIN_CONFIDENCE,
   processAssistantText,
   processUserText,
+  expandSqzInText,
   type PluginDeps,
 } from "../../src/plugin/core.js";
-import { expandSqzInText } from "../../src/plugin/core.js";
-import { buildEnvelope, findPayloadCandidates } from "../../src/plugin/format.js";
+import { buildEnvelope, findLineCandidates } from "../../src/plugin/format.js";
 import { compress, expand } from "../../src/translator.js";
 import { DEFAULT_LEXICON } from "../../src/providers.js";
 import { estimateTokens } from "../../src/tokens.js";
-import type { CompressOptions, CompressResult, Lexicon, SQZPayload } from "../../src/types.js";
+import type { CompressOptions, CompressResult, Lexicon, SQZLine } from "../../src/types.js";
 
 const PROSE = "Refactor the tokenizer in src/tokenizer.ts. Preserve runtime behavior. Minimal diff.";
 const PROSE_TOKENS = estimateTokens(PROSE); // ~16, well above the test threshold
@@ -34,12 +35,13 @@ function realDeps(log?: (m: string) => void): PluginDeps {
 }
 
 describe("processUserText — happy path", () => {
-  it("compresses prose into an envelope carrying the payload", async () => {
+  it("compresses prose into an envelope carrying the SQZ line", async () => {
     const outcome = await processUserText(PROSE, realDeps(), OPTS);
     expect(outcome.compressed).toBe(true);
-    expect(outcome.payload?.mode).toBe("refactor");
-    expect(outcome.text).toContain("[SQZ v1]");
+    expect(outcome.line).toMatch(/^refactor\b/);
+    expect(outcome.text).toContain("[SQZ v2]");
     expect(outcome.text).toContain("[/SQZ]");
+    expect(outcome.text).not.toContain('"mode"'); // no JSON envelope
   });
 
   it("includes lexicon block on first message (includeLexicon)", async () => {
@@ -56,15 +58,13 @@ describe("processUserText — happy path", () => {
     const outcome = await processUserText(PROSE, realDeps(), { ...OPTS, audit: true });
     expect(outcome.text).toContain("[SQZ original]");
     expect(outcome.text).toContain(PROSE);
-    expect(outcome.text.indexOf("[SQZ original]")).toBeLessThan(outcome.text.indexOf("[SQZ v1]"));
+    expect(outcome.text.indexOf("[SQZ original]")).toBeLessThan(outcome.text.indexOf("[SQZ v2]"));
   });
 
-  it("recoverability: original prose is always present via verbatim or audit", async () => {
+  it("recoverability: line carries v\"...\" verbatim segments", async () => {
     const outcome = await processUserText(PROSE, realDeps(), { ...OPTS, audit: false });
-    // RuleProvider keeps unencodable clauses in verbatim[] inside the payload.
-    expect(JSON.stringify(outcome.payload?.verbatim ?? [])).toBeTruthy();
-    const parts = outcome.payload ? outcome.text : "";
-    expect(parts).toContain("[SQZ v1]");
+    expect(outcome.line).toBeTruthy();
+    expect(outcome.text).toContain("[SQZ v2]");
   });
 });
 
@@ -92,17 +92,10 @@ describe("processUserText — gates and degradation", () => {
     expect(outcome.text).toBe(PROSE);
   });
 
-  it("low-confidence payload → original prose unchanged", async () => {
+  it("low-confidence result → original prose unchanged", async () => {
     const deps = realDeps();
     deps.compress = async (_p, _o): Promise<CompressResult> => ({
-      sqz: {
-        v: 1,
-        mode: "general",
-        target: { files: ["-"], lang: "text" },
-        constraints: [],
-        verbatim: [PROSE],
-        confidence: MIN_CONFIDENCE - 0.05,
-      },
+      sqz: `general Δ["-"] L:text v"${PROSE}"`,
       verbatim: [PROSE],
       confidence: MIN_CONFIDENCE - 0.05,
       latencyMs: 1,
@@ -115,14 +108,7 @@ describe("processUserText — gates and degradation", () => {
   it("confidence exactly at the gate compresses", async () => {
     const deps = realDeps();
     deps.compress = async (_p, _o): Promise<CompressResult> => ({
-      sqz: {
-        v: 1,
-        mode: "general",
-        target: { files: ["-"], lang: "text" },
-        constraints: [],
-        verbatim: [PROSE],
-        confidence: MIN_CONFIDENCE,
-      },
+      sqz: `general Δ["-"] L:text v"${PROSE}"`,
       verbatim: [PROSE],
       confidence: MIN_CONFIDENCE,
       latencyMs: 1,
@@ -144,17 +130,10 @@ describe("processUserText — gates and degradation", () => {
 });
 
 describe("processAssistantText — expansion", () => {
-  const PAYLOAD: SQZPayload = {
-    v: 1,
-    mode: "debug",
-    target: { files: ["src/main.ts"], lang: "ts" },
-    constraints: ["∂ (empty input, null)", "μ"],
-    verbatim: [],
-    confidence: 0.95,
-  };
+  const LINE: SQZLine = 'debug Δ["src/main.ts"] L:ts ∂[(empty input, null)] μ';
 
-  it("expands a marker-block payload to prose", () => {
-    const sqzText = `Plan:\n${buildEnvelope(PAYLOAD, { includeLexicon: false })}\nDone.`;
+  it("expands a marker-block line to prose", () => {
+    const sqzText = `Plan:\n${buildEnvelope(LINE, { includeLexicon: false })}\nDone.`;
     const deps = realDeps();
     const outcome = processAssistantText(sqzText, deps, { expand: true });
     expect(outcome.expanded).toBe(true);
@@ -166,15 +145,8 @@ describe("processAssistantText — expansion", () => {
     expect(outcome.text).toContain("Done.");
   });
 
-  it("expands bare JSON payload", () => {
-    const sqzText = `Here: ${JSON.stringify(PAYLOAD)}`;
-    const outcome = processAssistantText(sqzText, realDeps(), { expand: true });
-    expect(outcome.expanded).toBe(true);
-    expect(outcome.text).toContain("Debug src/main.ts in ts.");
-  });
-
   it("expand toggle off → text byte-identical", () => {
-    const sqzText = buildEnvelope(PAYLOAD, { includeLexicon: false });
+    const sqzText = buildEnvelope(LINE, { includeLexicon: false });
     const outcome = processAssistantText(sqzText, realDeps(), { expand: false });
     expect(outcome.expanded).toBe(false);
     expect(outcome.text).toBe(sqzText);
@@ -190,10 +162,14 @@ describe("processAssistantText — expansion", () => {
   it("flags unknown symbols in audit but still renders the message", () => {
     const lexicon = DEFAULT_LEXICON.filter((e) => e.symbol !== "Δ");
     const deps: PluginDeps = { ...realDeps(), lexicon };
-    const payload: SQZPayload = { ...PAYLOAD, constraints: ['Δ ["src/x.ts"]', "μ"] };
-    const outcome = processAssistantText(JSON.stringify(payload), deps, { expand: true });
+    const line: SQZLine = 'debug Δ["src/x.ts"] L:ts Δ["src/x.ts"] μ';
+    const outcome = processAssistantText(
+      buildEnvelope(line, { includeLexicon: false }),
+      deps,
+      { expand: true },
+    );
     expect(outcome.expanded).toBe(true);
-    expect(outcome.text).toContain('Δ ["src/x.ts"]'); // rendered literally
+    expect(outcome.text).toContain("Δ"); // rendered literally
     expect(outcome.auditFlags).toContain("unknown-symbol:Δ");
   });
 
@@ -202,38 +178,30 @@ describe("processAssistantText — expansion", () => {
     deps.expandFn = () => {
       throw new Error("expand boom");
     };
-    const sqzText = buildEnvelope(PAYLOAD, { includeLexicon: false });
+    const sqzText = buildEnvelope(LINE, { includeLexicon: false });
     const outcome = processAssistantText(sqzText, deps, { expand: true });
     expect(outcome.expanded).toBe(false);
     expect(outcome.text).toBe(sqzText);
   });
 
-  it("expands multiple payloads in one message", () => {
-    const a = JSON.stringify(PAYLOAD);
-    const b = JSON.stringify({ ...PAYLOAD, mode: "docs" });
+  it("expands multiple lines in one message", () => {
+    const a = buildEnvelope(LINE, { includeLexicon: false });
+    const b = buildEnvelope('docs Δ["README.md"] L:md ⌁', { includeLexicon: false });
     const outcome = processAssistantText(`A: ${a}\nB: ${b}`, realDeps(), { expand: true });
     expect(outcome.expanded).toBe(true);
     expect(outcome.text).toContain("Debug src/main.ts in ts.");
-    expect(outcome.text).toContain("Write docs for src/main.ts in ts.");
-    expect(outcome.text).not.toContain("SQZPayload");
+    expect(outcome.text).toContain("Write docs for README.md in md.");
   });
 });
 
 describe("expandSqzInText (format-adjacent helper)", () => {
-  it("is idempotent: expanded text contains no payload candidates", () => {
-    const PAYLOAD: SQZPayload = {
-      v: 1,
-      mode: "review",
-      target: { files: ["src/auth.ts"], lang: "ts" },
-      constraints: ["✓ examples run"],
-      verbatim: [],
-      confidence: 0.9,
-    };
+  it("is idempotent: expanded text contains no line candidates", () => {
+    const LINE: SQZLine = 'review Δ["src/auth.ts"] L:ts ✓[examples run]';
     const deps = realDeps();
     const audit: string[] = [];
-    const first = expandSqzInText(JSON.stringify(PAYLOAD), deps, audit);
+    const first = expandSqzInText(buildEnvelope(LINE, { includeLexicon: false }), deps, audit);
     expect(first.expanded).toBe(true);
-    expect(findPayloadCandidates(first.text)).toEqual([]);
+    expect(findLineCandidates(first.text)).toEqual([]);
     expect(audit).toEqual([]);
   });
 });

@@ -5,10 +5,12 @@
  * so unit tests never need a live model. Invariant: the user's original
  * prose is always recoverable; a failure at any point leaves the text
  * byte-identical to what arrived.
+ *
+ * v2: the payload inside the envelope is a plain SQZ line (no JSON envelope).
  */
 
-import type { CompressOptions, CompressResult, ExpandOptions, Lexicon, SQZPayload } from "../types.js";
-import { SQZ_PAYLOAD_OPEN, buildEnvelope, findPayloadCandidates } from "./format.js";
+import type { CompressOptions, CompressResult, ExpandOptions, Lexicon, SQZLine } from "../types.js";
+import { SQZ_PAYLOAD_OPEN, buildEnvelope, findLineCandidates } from "./format.js";
 
 /** Lexicon.md usage note: confidence below 0.9 → keep prose fallback. */
 export const MIN_CONFIDENCE = 0.9;
@@ -16,8 +18,8 @@ export const MIN_CONFIDENCE = 0.9;
 export interface PluginDeps {
   /** Compress via the translator ladder (provider + retry + passthrough). */
   compress: (prose: string, opts: CompressOptions) => Promise<CompressResult>;
-  /** Expand SQZ → prose (renders unknown symbols literally + audit flags). */
-  expandFn: (payload: SQZPayload, lexicon: Lexicon, opts?: ExpandOptions) => string;
+  /** Expand SQZ line → prose (renders unknown symbols literally + audit flags). */
+  expandFn: (line: SQZLine, lexicon: Lexicon, opts?: ExpandOptions) => string;
   /** Token estimator used for the threshold gate. */
   estimateTokens: (text: string) => number;
   /** Symbol dictionary. */
@@ -42,7 +44,7 @@ export interface ProcessUserOptions {
 export interface UserMessageOutcome {
   compressed: boolean;
   text: string;
-  payload?: SQZPayload;
+  line?: SQZLine;
 }
 
 /**
@@ -84,7 +86,7 @@ export async function processUserText(
     original: opts.audit ? text : undefined,
   });
 
-  return { compressed: true, text: envelope, payload: result.sqz };
+  return { compressed: true, text: envelope, line: result.sqz };
 }
 
 export interface AssistantOutcome {
@@ -93,13 +95,13 @@ export interface AssistantOutcome {
   auditFlags: string[];
 }
 
-/** Replace every SQZ payload candidate with expanded prose. Never throws. */
+/** Replace every SQZ v2 line candidate with expanded prose. Never throws. */
 export function expandSqzInText(
   text: string,
   deps: PluginDeps,
   auditFlags: string[],
 ): AssistantOutcome {
-  const candidates = findPayloadCandidates(text);
+  const candidates = findLineCandidates(text);
   if (candidates.length === 0) return { expanded: false, text, auditFlags: [] };
 
   let out = text;
@@ -107,7 +109,7 @@ export function expandSqzInText(
     const c = candidates[i];
     let prose: string;
     try {
-      prose = deps.expandFn(c.payload, deps.lexicon, { audit: auditFlags });
+      prose = deps.expandFn(c.line, deps.lexicon, { audit: auditFlags });
     } catch (err) {
       deps.log?.(`expand degraded: ${err instanceof Error ? err.message : String(err)}`);
       continue; // never corrupt: skip this candidate
@@ -119,7 +121,7 @@ export function expandSqzInText(
 }
 
 /**
- * Post hook: expand SQZ payloads in assistant output back to prose.
+ * Post hook: expand SQZ v2 lines in assistant output back to prose.
  * `expand` toggle off → text passes through byte-identical.
  */
 export function processAssistantText(
